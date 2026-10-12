@@ -69,13 +69,27 @@ import { diagnoseUnknownGenuiFields } from './genui-runtime/diagnostics.ts'
 import { normalizeGenuiSpec } from './genui-runtime/normalize.ts'
 import { sourceFencesOfAssistant, sourceLanguageAt } from './source-fence.ts'
 
-/** Fence surfaces the channel can take over, newest host first: the shared
- * CodeBlock surface every rc.6+ markdown fence renders through
- * (`.md-code-block`) and the deepsuite-style surfaces some host builds
- * render instead (`.code-block` / `.code-block-small`). Surfaces with an
- * unlisted class are still found by the structural backstop (label + `<pre>`),
- * so this list is an optimization, not a hard contract. */
+/** 优先用宿主代码块内容的语义标记定位包装节点；隐藏语言或改变类名不能阻断
+ * 原始消息的围栏识别。类名也用于仍以这些表面呈现的代码块。 */
 const CODE_BLOCK_SELECTORS = '.md-code-block, .code-block, .code-block-small'
+
+/** 在同一处收集代码块包装节点，供候选扫描和原始围栏序号共用。 */
+function codeBlockSurfaces(scope: ParentNode): HTMLElement[] {
+  const surfaces = new Set(scope.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTORS))
+  for (const content of scope.querySelectorAll<HTMLElement>('[data-code-block-content]')) {
+    if (content.parentElement !== null) surfaces.add(content.parentElement)
+  }
+  return [...surfaces].sort((left, right) => left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
+}
+
+/** 返回拥有代码内容语义节点、或已知代码块类名的最近包装节点。 */
+function closestCodeBlockSurface(element: Element | null): Element | null {
+  for (let current = element; current !== null; current = current.parentElement) {
+    if (current.matches(CODE_BLOCK_SELECTORS)
+      || [...current.children].some(child => child.hasAttribute('data-code-block-content'))) return current
+  }
+  return null
+}
 /** Marker attribute set on blocks this channel has taken over. */
 const PROCESSED = 'data-genui-rendered'
 /** The settled marker on AssistantMarkdown (absent = settled). */
@@ -201,7 +215,7 @@ function infostringOf(block: Element): 'dsh-ui' | 'svg' | null {
     // surface's banner, not `block`'s own banner. Only accept labels whose
     // nearest known surface is `block` itself (or none — unknown surfaces
     // stay supported by the structural backstop).
-    const owner = el.closest(CODE_BLOCK_SELECTORS)
+    const owner = closestCodeBlockSurface(el)
     if (owner !== null && owner !== block) continue
     return lang
   }
@@ -355,11 +369,11 @@ function implausibleLabeledAncestorOf(pre: HTMLElement, scope: ParentNode = docu
 function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
   const seen = new Set<HTMLElement>()
   const out: HTMLElement[] = []
-  for (const el of scope.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTORS)) {
+  for (const el of codeBlockSurfaces(scope)) {
     // Modifier classes can sit inside a surface (e.g. a `code-block-small`
     // child of `code-block`): only the outermost matching element is a
     // candidate, so a fence is never double-counted or taken over twice.
-    if (el.parentElement !== null && el.parentElement.closest(CODE_BLOCK_SELECTORS) !== null) continue
+    if (closestCodeBlockSurface(el.parentElement) !== null) continue
     if (el.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-svg-fence]`) !== null) continue
     if (seen.has(el)) continue
     // Message-level containers that happen to carry a surface class must
@@ -378,7 +392,8 @@ function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
     // markdown root holding both a dsh-ui fence and a python block — and
     // the backstop would mislabel that whole container as a fence, hiding
     // every other code block with it (issue #13).
-    if (pre.closest(`${CODE_BLOCK_SELECTORS}, .${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-svg-fence]`) !== null) continue
+    if (closestCodeBlockSurface(pre) !== null
+      || pre.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-svg-fence]`) !== null) continue
     const surface = surfaceOf(pre, scope)
     if (surface === null) {
       // Diagnose the issue #19 guard: a labeled ancestor that is NOT a code
@@ -399,7 +414,8 @@ function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
     seen.add(surface)
   }
   for (const span of scope.querySelectorAll<HTMLElement>('span')) {
-    if (span.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, ${CODE_BLOCK_SELECTORS}, [data-chat-group-part="reasoning"], [data-tool], [data-sidebar-chat], [data-sidebar-right-session], [data-sidebar-right-panel], [data-panel-conversation], [data-plugin-panel]`) !== null) continue
+    if (closestCodeBlockSurface(span) !== null
+      || span.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat-group-part="reasoning"], [data-tool], [data-sidebar-chat], [data-sidebar-right-session], [data-sidebar-right-panel], [data-panel-conversation], [data-plugin-panel]`) !== null) continue
     if (tagTextBodyOf(span) === null) continue
     out.push(span)
   }
@@ -481,8 +497,8 @@ function fenceIndexOf(ctx: Context, row: Element, block: Element, sourceLanguage
 
 /** Return outer host Markdown code surfaces in one assistant row's DOM order. */
 function hostFenceBlocksOf(row: Element): HTMLElement[] {
-  return [...row.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTORS)].filter(candidate => {
-    if (candidate.parentElement?.closest(CODE_BLOCK_SELECTORS) !== null) return false
+  return codeBlockSurfaces(row).filter(candidate => {
+    if (closestCodeBlockSurface(candidate.parentElement) !== null) return false
     if (candidate.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui], [data-genui-svg-fence]`) !== null) return false
     if (candidate.closest('[data-chat-group-part="reasoning"], [data-tool], [data-sidebar-chat], [data-sidebar-right-session], [data-sidebar-right-panel], [data-panel-conversation], [data-plugin-panel]') !== null) return false
     if (candidate.closest(ASSISTANT_FLOW_ROW) !== row) return false
