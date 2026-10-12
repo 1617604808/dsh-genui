@@ -74,6 +74,17 @@ function genericCodeBlock(raw: string, label = '代码块'): HTMLElement {
   return block
 }
 
+/** 宿主保留语义属性、但包装类名发生变化时的真实 CodeBlock 结构（#275）。 */
+function semanticCodeBlock(raw: string, label: string): HTMLElement {
+  const block = genericCodeBlock(raw, label)
+  block.className = 'host-code-surface'
+  const content = document.createElement('div')
+  content.setAttribute('data-code-block-content', '')
+  content.append(block.querySelector('pre')!)
+  block.append(content)
+  return block
+}
+
 /** Deepsuite-style fence surface (issue #6): `.code-block` / span language
  * label + copy button in the banner, body wrapped in a content div. */
 function deepsuiteCodeBlock(raw: string, lang: string, cls = 'code-block'): HTMLElement {
@@ -438,6 +449,36 @@ describe('installDomFenceRenderer', () => {
       expect(await waitFor(() => block.hasAttribute('data-genui-rendered'))).toBe(true)
       expect(await waitFor(() => row.querySelector('.genui-dom-fence')?.textContent?.includes('你好，世界') === true)).toBe(true)
     } finally { dispose() }
+  })
+
+  it.each([false, true])('reads source languages across semantic code surfaces when class names change (streaming=%s, #275)', async streaming => {
+    const row = assistantRow('semantic-source', streaming)
+    const prose = document.createElement('p')
+    prose.innerHTML = '说明里提到 <code>dsh-ui</code>，不能隐藏整条消息'
+    const aliasSpec = '{"items":[{"type":"text","text":"275 别名内容"}]}'
+    const blocks = [
+      semanticCodeBlock('print("保持普通代码")', 'python'),
+      semanticCodeBlock(VALID_SPEC, 'json'),
+      semanticCodeBlock(VALID_SPEC, 'Code block'),
+      semanticCodeBlock(aliasSpec, 'Code block'),
+    ]
+    row.append(prose, ...blocks)
+    document.body.append(row)
+    const markdown = ['python', 'json', '', 'dsh-ui'].map((language, index) =>
+      `\`\`\`${language}\n${blocks[index]!.querySelector('pre')!.textContent}\n\`\`\``).join('\n')
+    const chat = { nodes: { get: () => ({ kind: 'assistant-step', data: { blocks: [{ kind: 'text', text: markdown }] } }) } }
+    const sourceCtx = makeSourceCtx('semantic-session', () => chat, () => () => {})
+    expect(blocks.map(block => sourceLanguageOf(sourceCtx, block))).toEqual(['python', 'json', null, 'dsh-ui'])
+    const dispose = installDomFenceRenderer(sourceCtx, () => {})
+    try {
+      expect(await waitFor(() => row.querySelector('.genui-dom-fence')?.textContent?.includes('275 别名内容') === true)).toBe(true)
+      expect(row.querySelectorAll('.genui-dom-fence')).toHaveLength(1)
+      expect(blocks[3]!.style.display).toBe('none')
+      for (const block of blocks.slice(0, 3)) expect(block.style.display).toBe('')
+      expect(prose.isConnected).toBe(true)
+      expect(row.style.display).toBe('')
+    } finally { dispose() }
+    expect(blocks[3]!.style.display).toBe('')
   })
 
   it('parses each assistant Markdown source once after the opening language is stable', async () => {
