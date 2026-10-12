@@ -123,9 +123,10 @@ export function fenceFailures(text: string): FenceFailure[] {
 
 /** `null` when this fence renders; otherwise the reason it does not. */
 function fenceFailureDetail(fence: ExtractedFence): string | null {
-  if (!fence.closed) return 'error=unterminated_fence\nrequired=closing_fence'
   const resolution = resolveFence(fence.raw, { settled: true })
   if (resolution.spec !== null) return null
+  // 缺少 Markdown 收尾不等于渲染失败；先复用 renderer 判断，避免把已显示的卡片重发（#288）。
+  if (!fence.closed) return 'error=unterminated_fence\nrequired=closing_fence'
   if (resolution.processed !== null) {
     const dropped = droppedNodeFailure(resolution.processed, resolution.value)
     return dropped?.join('\n')
