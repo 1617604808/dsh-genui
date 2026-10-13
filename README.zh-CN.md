@@ -270,7 +270,7 @@ pnpm run check   # 类型检查 + 全量测试 + 构建
 
 已验证宿主角色为 minimum `dsh-v0.1.2-rc.1`、current `dsh-v0.2.0-rc.2`、next `dsh-v0.2.1-alpha.1`。DSH `0.2.1-alpha.1` 当前属于预发布版本。CI 保持四条主要 lane：Node 22 + current，以及 Node 24 + minimum/current/next。DSH 发布新版本后，替换对应固定标签。
 
-`pnpm run check:host-api dsh-v0.2.0-rc.2` 与 `pnpm run check:host-api dsh-v0.2.1-alpha.1` 会安装对应 DSH 发布包，运行 TypeScript 类型检查、插件生命周期测试（包括技能注册与持久化纠错恢复）和 tsdown 构建。每条 CI 宿主 lane 随后会把生成的 tarball 安装到固定版本的 DSH 宿主并运行 packed smoke。
+`pnpm run check:host-api dsh-v0.2.0-rc.2` 与 `pnpm run check:host-api dsh-v0.2.1-alpha.1` 会安装对应 DSH 发布包（以及这些包未声明、由宿主 App 外层提供的运行时依赖闭包），运行 TypeScript 类型检查、**全量单元测试**和 tsdown 构建——所有非门控套件都会对真实的新宿主包执行。注意：被 `skipIf(!hasFenceRegistry)` 门控的套件在任何已发布宿主下都会跳过——`registerFenceRenderer` 从未出现在任何已发布的 `dsh-client-ui-primitives` 中（这批门控测试覆盖的是一个仅内部存在过的宿主契约，详见 CHANGELOG）。每条 CI 宿主 lane 随后会把生成的 tarball 安装到固定版本的 DSH 宿主并运行 packed smoke。
 
 运行 `node scripts/verify-pack.mjs --keep` 可保留已验收的 tarball，便于检查或运行 e2e；默认的 `node scripts/verify-pack.mjs` 会在验收后清理临时目录。
 

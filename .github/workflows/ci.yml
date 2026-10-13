@@ -63,7 +63,7 @@ jobs:
         if: matrix.role == 'minimum'
         run: pnpm run build
 
-      - name: Check published host API (typecheck + plugin lifecycle + build)
+      - name: Check published host API (typecheck + full unit suite + build)
         if: matrix.role != 'minimum'
         run: pnpm run check:host-api "${{ matrix.host-ref }}"
 

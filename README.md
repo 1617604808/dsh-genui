@@ -256,7 +256,7 @@ With the locked dependencies installed, the check script (`pnpm run check` or `n
 
 The verified host roles are minimum `dsh-v0.1.2-rc.1`, current `dsh-v0.2.0-rc.2`, and next `dsh-v0.2.1-alpha.1`. DSH `0.2.1-alpha.1` is currently a prerelease. CI keeps four primary lanes: Node 22 + current, and Node 24 + minimum/current/next. Replace these pinned tags as DSH publishes newer versions.
 
-`pnpm run check:host-api dsh-v0.2.0-rc.2` and `pnpm run check:host-api dsh-v0.2.1-alpha.1` install the corresponding published DSH packages and run TypeScript typecheck, plugin lifecycle tests (including skill registration and persisted feedback recovery), and tsdown build. Each CI host lane then installs the generated tarball in its pinned DSH host and runs the packed smoke.
+`pnpm run check:host-api dsh-v0.2.0-rc.2` and `pnpm run check:host-api dsh-v0.2.1-alpha.1` install the corresponding published DSH packages (plus the host-app runtime closure those packages import without declaring) and run TypeScript typecheck, the **full unit test suite**, and tsdown build — every non-gated suite executes against the real new host packages. Note: the `skipIf(!hasFenceRegistry)`-gated suites stay skipped under every published host — `registerFenceRenderer` has never shipped in any published `dsh-client-ui-primitives` (the gated tests cover a host contract that only existed internally; see CHANGELOG). Each CI host lane then installs the generated tarball in its pinned DSH host and runs the packed smoke.
 
 Run `node scripts/verify-pack.mjs --keep` to retain the verified tarball for inspection or e2e use. The default `node scripts/verify-pack.mjs` removes its temporary directory after verification.
 

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 测试
+
+- **`check:host-api` 改跑全量单元测试**：此前它只运行 2 个插件生命周期文件，切宿主时其余 97 个测试文件从不参与。现在对非 minimum 宿主运行完整 `vitest run`（隔离目录补拷 `scripts/`，`e2e-auth` 按相对路径读取其中源码），所有非门控套件都会对真实的新宿主包执行。配套改动：
+  - 发布宿主包存在**未声明的运行时依赖**（`ui-primitives` 直接 import `clsx`/`shiki`/`simple-icons`，`client-store` import `zustand`/`immer` 等，真实宿主由 App 外层提供）——隔离目录显式补装这份宿主运行时闭包，否则 vite 在模块加载阶段以 "Failed to resolve import" 拒绝整批测试文件；新宿主引入新的幽灵依赖时 vitest 会点名报错，届时在脚本清单中追加；
+  - 首次在 0.1.7-rc.2 / 0.2.0-rc.2 上执行全量套件即发现 `genui-diff-labels` 的「rc.1 diff 契约」用例失败（0.1.7+ 的 DiffBlock 工具栏不再随容器 `textContent` 暴露）。该用例改为只在最低宿主世代（≤0.1.2-rc.1，即锁定的 devDependencies）断言，0.1.7+/0.2.x 专属契约待真实宿主浏览器验证后补充。
+- **发现：`skipIf(!hasFenceRegistry)` 门控的 14 个测试文件（约 99 个用例）从未执行过，也无法对任何已发布宿主执行**。核查 0.1.2-rc.1 → 0.2.0-rc.2 全部已发布 `dsh-client-ui-primitives`（npm 包与 DSH 源码仓库）：`registerFenceRenderer` 这个导出**从未存在**——宿主 `MarkdownText` 有自己的 fence 解析，但不消费任何注册的外部 fence 渲染器。即门控条件在所有环境下恒为 false，这批套件（fence 正文渲染、流式渲染、图表布局、`input-durable-value-priority` 等）自加入起就是死测试，覆盖的只是一个仅内部存在过的宿主契约（与 #275 中「fence-registry 扩展点已不存在」相互印证）。处置待定：改写为 DOM 通道等价用例、或等宿主真正发布该扩展点；本条先落档为证。
+
 ## [0.12.0] - 2026-10-13
 
 ### 新增
