@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { MarkdownText } from './genui-markdown.tsx'
 import { GENUI_LIMITS } from '../src/client/genui-runtime/index.ts'
+import { processGenuiSpec } from '../src/client/guard.ts'
 
 afterEach(cleanup)
 
@@ -31,16 +32,29 @@ describe('render caps', () => {
     expect(document.querySelector('[data-genui]')).not.toBeNull()
   })
 
-  // 已知冲突(#298):guard 的 maxTabs 截断(guard.ts 的 break)与围栏级
-  // 「声明数 vs 渲染数」校验互相抵消——截断丢弃的 tab 被计为缺陷,整条
-  // 围栏被拒成代码块,截断路径实际是死路。it.fails 钉住期望行为,修复
-  // 后本用例恢复为普通 it。
-  it.fails('caps tabs at render time', () => {
-    render(<MarkdownText text={fenced({ items: [
+  // #298 方向 A:政策性截断不再计入「声明 vs 渲染」缺陷账——超限 tabs
+  // 截断到 maxTabs 后照常渲染,并向模型发出 policy_truncated 教学警告。
+  it('caps tabs at render time', () => {
+    const spec = { items: [
       { type: 'tabs', tabs: Array.from({ length: 30 }, (_, i) => ({ label: `tab ${i}`, items: [{ type: 'text', content: `body ${i}` }] })) },
-    ] })} />)
+    ] }
+    const { container } = render(<MarkdownText text={fenced(spec)} />)
+    expect(container.querySelector('[data-genui]')).not.toBeNull()
     const tabs = screen.getAllByRole('tab')
-    expect(tabs.length).toBeLessThanOrEqual(GENUI_LIMITS.maxTabs)
+    expect(tabs.length).toBe(GENUI_LIMITS.maxTabs)
+    const processed = processGenuiSpec(spec)
+    expect(processed.errors).toEqual([])
+    expect(processed.warnings.some(w => w.kind === 'truncated')).toBe(true)
+  })
+
+  it('caps accordion items at render time with the same teaching warning', () => {
+    const spec = { items: [
+      { type: 'accordion', items: Array.from({ length: 30 }, (_, i) => ({ title: `头 ${i}`, items: [{ type: 'text', content: `体 ${i}` }] })) },
+    ] }
+    const processed = processGenuiSpec(spec)
+    expect(processed.errors).toEqual([])
+    expect(processed.renderedNativeCount).toBeGreaterThan(0)
+    expect(processed.warnings.some(w => w.kind === 'truncated')).toBe(true)
   })
 
   it('caps file-tree depth at render time', () => {

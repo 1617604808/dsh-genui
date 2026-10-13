@@ -165,6 +165,9 @@ function formatProcessWarnings(processed: GenuiProcessResult): string[] {
     if (warning.kind === 'unknown-field') {
       return `warning=unknown_field path=${JSON.stringify(warning.path)} detail=${JSON.stringify(warning.message)}`
     }
+    if (warning.kind === 'truncated') {
+      return `warning=policy_truncated path=${JSON.stringify(warning.path)} detail=${JSON.stringify(warning.message)}`
+    }
     return `warning=process detail=${JSON.stringify(warning.message)}`
   })
 }
