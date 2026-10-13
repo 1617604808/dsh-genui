@@ -5,8 +5,7 @@
 // existing type, this file catches it.
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { hasFenceRegistry } from './helpers/fence-host'
-import { MarkdownText } from './markdown-labels.tsx'
+import { MarkdownText } from './genui-markdown.tsx'
 import { gallerySpec } from '../src/client/gallery.ts'
 import { repairGenuiSpec } from '../src/client/guard.ts'
 import { GENUI_LIMITS } from '../src/client/genui-runtime/index.ts'
@@ -23,7 +22,7 @@ describe('gallery spec', () => {
     expect(repaired).toEqual(gallerySpec)
   })
 
-  it.skipIf(!hasFenceRegistry)('renders every component family through the fence path', () => {
+  it('renders every component family through the fence path', () => {
     render(<MarkdownText text={fenced(gallerySpec)} />)
     const body = document.body.textContent ?? ''
     // Layout + text hierarchy
@@ -33,7 +32,8 @@ describe('gallery spec', () => {
     expect(body).toContain('成功')
     expect(body).toContain('CPU')
     expect(body).toContain('训练进度')
-    expect(document.querySelector('audio[controls][preload="none"]')).not.toBeNull()
+    // 音频控件现行契约为 preload="metadata"(basic.tsx);不再断言 "none"。
+    expect(document.querySelector('audio[controls][preload="metadata"]')).not.toBeNull()
     expect(body).toContain('性能指标')
     expect(body).toContain('版本')
     expect(body).toContain('标题项')
