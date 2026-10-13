@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **quiz 选项按钮的可访问名不再混入 ○/✓/✗ 标记**：标记符号的 span 补上 `aria-hidden="true"`,读屏器与 `getByRole` 查询听到的名字就是选项文本本身（此前为「○对」这类拼合名）。
+
+### 测试
+
+- **复活 96 个从未执行过的 fence 渲染用例**：新增测试双替身 `tests/genui-markdown.tsx`——散文照常渲染、`dsh-ui` 围栏交给插件真实的 `renderGenuiFence` 入口（DOM 通道生产环境调用的同一函数，settled 时提供合成 source、streaming 时包 `[data-streaming]`）。原先 `skipIf(!hasFenceRegistry)` 门控的 14 个文件改走该入口后全部执行；主套件从 1113 通过 / 99 死跳过变为 1209 通过 / 3 跳过。复活即修的陈旧断言：donut 图例格式（`{value} · {pct}%`）、gallery 音频 `preload="metadata"`、settled 渲染的导出入口与 spec 内同名按钮共存。3 个依赖 `registerGenuiComponent` 的用例改为按真实特性探测门控（`hasComponentRegistry`，同为从未发布的契约线扩展点）。
+- **发现并钉住一个真冲突（#298）**：`caps tabs at render time` 标记为 `it.fails`——guard 的 maxTabs 截断与围栏级「声明数 vs 渲染数」校验互相抵消，超限 tabs 节点导致整条围栏被拒成代码块，截断路径是死路。处置方向见 issue。
+
 ## [0.12.0] - 2026-10-13
 
 ### 新增
