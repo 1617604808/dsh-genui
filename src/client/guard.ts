@@ -1293,12 +1293,19 @@ export const GENUI_NODE_TYPES: ReadonlySet<string> = GENUI_NATIVE_TYPES
  * white-listed string, descending the same containers `countGenuiNodes`
  * walks. Callers can inspect field semantics or compare the count with the
  * repaired tree without maintaining another traversal.
+ *
+ * With `familyCaps` (default) the traversal applies the same per-family
+ * policy caps repair enforces (tabs ≤ maxTabs, accordion items ≤
+ * maxAccordionItems): nodes beyond a cap are policy-truncated, not defects,
+ * so the declared-vs-rendered ledger must not count them as vanished (#298).
  */
 function visitDeclaredGenuiNodes(
   value: unknown,
   cap: number,
   visit: (node: Record<string, unknown>, at: string) => void,
+  options: { familyCaps?: boolean } = {},
 ): number {
+  const familyCaps = options.familyCaps !== false
   let count = 0
   const declared = (candidate: unknown): boolean => {
     const o = obj(candidate)
@@ -1318,11 +1325,13 @@ function visitDeclaredGenuiNodes(
     count += 1
     visit(v, at)
     if (v.type === 'tabs' && Array.isArray(v.tabs)) {
-      for (let tab = 0; tab < v.tabs.length; tab++) {
+      const tabCount = familyCaps ? Math.min(v.tabs.length, GENUI_LIMITS.maxTabs) : v.tabs.length
+      for (let tab = 0; tab < tabCount; tab++) {
         walkItemsOf(v.tabs[tab], `${at}.tabs[${tab}]`)
       }
     } else if (v.type === 'accordion' && Array.isArray(v.items)) {
-      for (let row = 0; row < v.items.length; row++) {
+      const rowCount = familyCaps ? Math.min(v.items.length, GENUI_LIMITS.maxAccordionItems) : v.items.length
+      for (let row = 0; row < rowCount; row++) {
         walkItemsOf(v.items[row], `${at}.items[${row}]`)
       }
     } else if ((v.type === 'row' || v.type === 'col' || v.type === 'grid' || v.type === 'card') && Array.isArray(v.items)) {
@@ -1358,10 +1367,11 @@ function visitDeclaredGenuiNodes(
  * Count white-listed nodes declared by a raw spec before repair drops invalid entries.
  * @param value - raw GenUI spec.
  * @param cap - traversal ceiling.
+ * @param options - `familyCaps: false` counts beyond per-family policy caps too.
  * @returns declared node count up to the ceiling.
  */
-export function countDeclaredGenuiNodes(value: unknown, cap = Number.POSITIVE_INFINITY): number {
-  return visitDeclaredGenuiNodes(value, cap, () => {})
+export function countDeclaredGenuiNodes(value: unknown, cap = Number.POSITIVE_INFINITY, options: { familyCaps?: boolean } = {}): number {
+  return visitDeclaredGenuiNodes(value, cap, () => {}, options)
 }
 
 /** Count native nodes that survived repair, excluding opaque custom nodes. */
@@ -1488,7 +1498,14 @@ export function processGenuiSpec(value: unknown): GenuiProcessResult {
   const normalized = normalizeGenuiSpec(value)
   const repaired = repairCanonicalGenuiSpec(normalized.value)
   const validation = validateCanonicalGenuiSpec(normalized.value)
+  // Policy-aware ledger (#298): nodes beyond a per-family cap (tabs ≤
+  // maxTabs, accordion items ≤ maxAccordionItems) are truncated BY DESIGN, so
+  // they are not counted as "declared but vanished" — otherwise the fence
+  // below would always degrade to a code block and the truncation in repair
+  // could never take effect. The uncapped pass measures the truncation for
+  // the teaching warning instead.
   const declaredNativeCount = countDeclaredGenuiNodes(normalized.value, GENUI_LIMITS.maxNodes + 1)
+  const uncappedDeclaredCount = countDeclaredGenuiNodes(normalized.value, GENUI_LIMITS.maxNodes + 1, { familyCaps: false })
   const renderedNativeCount = repaired === null ? 0 : countRenderedNativeGenuiNodes(repaired)
   const renderedTotalCount = repaired === null ? 0 : countGenuiNodes(repaired)
   // The shared public validator preserves its historical diagnostic for an
@@ -1501,13 +1518,21 @@ export function processGenuiSpec(value: unknown): GenuiProcessResult {
   if (declaredNativeCount > renderedNativeCount) {
     errors.push(`repair dropped ${declaredNativeCount - renderedNativeCount} declared native node(s): declared ${declaredNativeCount}, rendered ${renderedNativeCount}`)
   }
+  const warnings: GenuiDiagnostic[] = [...normalized.warnings, ...diagnoseUnknownGenuiFields(normalized.value)]
+  if (uncappedDeclaredCount > declaredNativeCount) {
+    warnings.push({
+      kind: 'truncated',
+      path: 'spec',
+      message: `策略上限截断:${uncappedDeclaredCount - declaredNativeCount} 个声明节点超出 tabs ≤ ${GENUI_LIMITS.maxTabs} / accordion ≤ ${GENUI_LIMITS.maxAccordionItems} 的上限,未渲染;围栏照常渲染,重发时可拆分为多个组件`,
+    })
+  }
   return {
     value: normalized.value,
     normalized: normalized.value,
     repaired,
     spec: repaired,
     errors: [...new Set(errors)],
-    warnings: [...normalized.warnings, ...diagnoseUnknownGenuiFields(normalized.value)],
+    warnings,
     // Compatibility fields retain their historical meanings: declaredCount
     // is native declarations, while renderedCount is the total rendered tree.
     declaredCount: declaredNativeCount,
