@@ -222,3 +222,15 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 4. **新增小项**：四个折叠 chevron 字形（detail/group/accordion/file-tree）从 10/11px 混用统一为 11px——图标字形不入字号刻度，但必须彼此一致。
 5. **视觉回归已在无 Chrome 的机器上跑通**（2026-10-14 补）：`e2e-visual.mts` 浏览器解析顺序改为 `E2E_CHROMIUM` → 系统 Chrome → playwright 注册表 → 自动发现 ms-playwright 缓存里已有的 `chromium-*` 构建；遮罩清理幂等化（宿主 React 重渲染会重挂遮罩，须在每次指针交互前重跑）。本机全量 PASS（含 #206 堆叠柱回归、tooltip、流式骨架、按需引擎）。过程中发现两个坑：① `link:` 安装的是 `lib/` 预构建产物而脚本**不自动构建**，本机 lib 曾是 9 月陈旧产物——跑视觉回归前必须先 `pnpm build`；② **双主题 × 560px 窄列夹具矩阵仍未落**（脚本目前只截浅色全页 + 交互态），属阶段一收尾项。
 6. **范围澄清**：TemplateDrawer / PlotBlock / ArtifactExport 三个次级样式表的令牌化不在阶段一（它们是插件 chrome，非模型组件面）；TemplateDrawer 本身不加范式模板（2026-10-14 用户裁定，样板改放 GitHub Pages），其令牌化另行择机。
+
+---
+
+## 11. 阶段二试点实施记录（2026-10-14，与阶段一同分支）
+
+试点范围 = B2（divider.label）+ 两个数据最强的范式（主表明细、结论卡）。已落地：
+
+- B2 全链路：spec/schema/别名（title、text→label）/repair 截断/渲染（线+标签+线，全令牌化）/SKILL 字段行「何时不用」/画廊示例/schema 测试。
+- **顺带修复存量 bug**：`validate_dsh_ui` 的手写类型清单漏了 `divider` 与 `spacer`，含它们的围栏发前校验一律误报 "unknown type"（渲染管线按契约过滤误报，线上渲染未受影响）——divider.label 的 schema 测试暴露，已在校验 switch 显式放行。
+- SKILL.md 新增「编排范式」节（试点两例，各带可渲染示例 + 何时不用），定位写明「验证过的起点不是模板」，与既有「不要照抄」原则衔接；示例围栏受 `tests/genui-skill-examples.spec.ts` 全管线校验。
+- 系统提示词加一行触发器（挂在该节既有的组合建议行之后）。
+- 待办：合并发布后两周跑 `genui-usage-audit.mjs` 前后对比（divider.label 采用率、范式命中率、junk 告警率、版式熵）；数据支持再铺开其余四个范式。
