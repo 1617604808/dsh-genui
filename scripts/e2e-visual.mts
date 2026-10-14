@@ -317,6 +317,27 @@ try {
   await page.screenshot({ path: join(OUT_DIR, 'gallery.png'), fullPage: true })
   log(`✓ 截图 gallery.png`)
 
+  // ── A5 夹具矩阵：深色主题 × 560px 窄列 ─────────────────────────────────
+  // #159 的教训是「浅色表面方向」这类问题只有换主题才现形；#280 一类溢出只有
+  // 窄列才现形。三张夹具与 gallery.png 一起构成 light/dark × wide/narrow 矩阵，
+  // 供视觉回归对比；截完恢复宽幅浅色基线，后续交互断言不受影响。
+  async function captureMatrixShot(name: string, dark: boolean, width: number): Promise<void> {
+    await page.setViewportSize({ width, height: 3000 })
+    await page.evaluate((isDark: boolean) => {
+      if (isDark) document.body.setAttribute('data-ds-dark-theme', '')
+      else document.body.removeAttribute('data-ds-dark-theme')
+    }, dark)
+    await page.waitForTimeout(600)
+    await page.screenshot({ path: join(OUT_DIR, name), fullPage: true })
+    log(`✓ 截图 ${name}`)
+  }
+  await captureMatrixShot('gallery-dark.png', true, 1440)
+  await captureMatrixShot('gallery-narrow.png', false, 560)
+  await captureMatrixShot('gallery-dark-narrow.png', true, 560)
+  await page.setViewportSize({ width: 1440, height: 3000 })
+  await page.evaluate(() => document.body.removeAttribute('data-ds-dark-theme'))
+  await page.waitForTimeout(400)
+
   // Per-component crops: the gallery is far taller than a viewport, so a
   // single full-page shot is useless for reviewing one component's design.
   const parts: Array<[string, string]> = [
