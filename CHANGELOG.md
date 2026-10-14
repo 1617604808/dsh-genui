@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 变更（设计系统 v11 · 选集美学纲领阶段一）
+
+- **字号刻度补洞并按归属命名**：新增 `--dsl-g-font-stat`（34，指标卡基础值）/ `--dsl-g-font-stat-hero`（44，单一超大指标）/ `--dsl-g-font-mega`（52，hero 封面大数字）三档——此前 stat 基础值借用 `--dsl-g-font-hero`、44px 与 52px 为游离死值；围栏标题（banner 22px→h1 档 24px，底部间距 18→`--dsl-g-gap-xl` 24px，章节呼吸）、hero 封面标题（20px→h2 档）、环形进度中心值（17px→h3 档）等全部游离字号收进刻度；四个折叠 chevron 字形统一 11px（图标字形不入字号刻度，但彼此一致）。新增 `--dsl-g-gap-xl: 24px` 章节间距档。
+- **动效令牌化**：新增 `--dsl-g-dur-fast`（0.15s 控件反馈）/ `--dsl-g-dur-grow`（0.6s 数据生长）/ `--dsl-g-dur-reveal`（0.45s 入场）与统一缓动 `--dsl-g-ease-out`；全部 transition/animation 字面量（0.12s/0.15s/0.18s/0.2s/0.5s/0.6s）按职责归档，`prefers-reduced-motion` 覆盖不变。
+- **交互态统一**：按钮 hover 从 brightness 滤镜迁到主题感知的 4% label wash（以 background-image 叠加，不覆盖 danger/success 底色；primary 单独提亮 accent）；面板头部/关闭/模板按钮的 `rgba(255,255,255,…)` hover 字面量在浅色主题下不可见，改为 `--dsl-g-hover` / `--dsl-g-hover-strong`（新增 8% 强档）；面板切换/模板/关闭按钮补齐 focus-visible 焦点环。
+- **ECharts preset 字号从令牌解析**：gauge 标题/中心值、graph 节点标签三处内嵌死值字号改读 `--dsl-g-font-data/meta/display`（图表容器在 `.block` 内继承令牌；脱离文档渲染回退同值字面量，行为不变）。
+
 ### 修复
 
 - **#298 方向 A:政策性截断不再导致整条围栏被拒**。guard 的 tabs ≤12 / accordion ≤24 截断与围栏级「声明数 vs 渲染数」校验（#42）此前互相抵消——截断丢弃的节点被计为缺陷,超限 tabs 让整条围栏降级成代码块并触发纠错重发,截断路径实际是死路。现在声明计数器应用与 repair 相同的家族上限:政策截断的节点不计入「消失」账目,围栏截断后照常渲染;与既有的两类豁免（全局 200 节点预算的 intentional-cut、超深链的剪枝二次校验）行为一致。模型侧新增 `policy_truncated` 教学警告（`validate_dsh_ui` 输出,不触发纠错）,提示拆分组件;SKILL.md 使用规则同步注明 tabs/accordion 上限。
