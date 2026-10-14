@@ -83,12 +83,27 @@ function codeBlockSurfaces(scope: ParentNode): HTMLElement[] {
 }
 
 /** 返回拥有代码内容语义节点、或已知代码块类名的最近包装节点。 */
-function closestCodeBlockSurface(element: Element | null): Element | null {
+function closestCodeBlockSurface(
+  element: Element | null,
+  owners?: WeakMap<Element, Element | null>,
+): Element | null {
+  // 缓存仅在同一次同步候选扫描内复用，后续 DOM 更新会创建新的缓存。
+  const visited: Element[] = []
+  let owner: Element | null = null
   for (let current = element; current !== null; current = current.parentElement) {
+    if (owners?.has(current)) {
+      owner = owners.get(current) ?? null
+      break
+    }
+    visited.push(current)
     if (current.matches(CODE_BLOCK_SELECTORS)
-      || [...current.children].some(child => child.hasAttribute('data-code-block-content'))) return current
+      || [...current.children].some(child => child.hasAttribute('data-code-block-content'))) {
+      owner = current
+      break
+    }
   }
-  return null
+  for (const current of visited) owners?.set(current, owner)
+  return owner
 }
 /** Marker attribute set on blocks this channel has taken over. */
 const PROCESSED = 'data-genui-rendered'
@@ -186,12 +201,12 @@ function isTextNode(node: Node): node is Text {
 /** 读取 DSH Desktop 0.11.0 将 dsh-ui 围栏呈现为纯文本标签时的正文。 */
 function tagTextBodyOf(block: Element): string | null {
   if (block.tagName !== 'SPAN' || block.childElementCount !== 0) return null
-  const flowKind = block.closest('[data-chat-flow-kind]')?.getAttribute('data-chat-flow-kind')
-  if (flowKind !== undefined && flowKind !== null && flowKind !== 'assistant-step') return null
   const text = block.textContent?.trim() ?? ''
   const opening = '<dsh-ui>'
   const closing = '</dsh-ui>'
   if (!text.startsWith(opening) || !text.endsWith(closing)) return null
+  const flowKind = block.closest('[data-chat-flow-kind]')?.getAttribute('data-chat-flow-kind')
+  if (flowKind !== undefined && flowKind !== null && flowKind !== 'assistant-step') return null
   return text.slice(opening.length, -closing.length).trim()
 }
 
@@ -367,13 +382,14 @@ function implausibleLabeledAncestorOf(pre: HTMLElement, scope: ParentNode = docu
  * exact `dsh-ui` label is never taken over.
  */
 function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
+  const surfaceOwners = new WeakMap<Element, Element | null>()
   const seen = new Set<HTMLElement>()
   const out: HTMLElement[] = []
   for (const el of codeBlockSurfaces(scope)) {
     // Modifier classes can sit inside a surface (e.g. a `code-block-small`
     // child of `code-block`): only the outermost matching element is a
     // candidate, so a fence is never double-counted or taken over twice.
-    if (closestCodeBlockSurface(el.parentElement) !== null) continue
+    if (closestCodeBlockSurface(el.parentElement, surfaceOwners) !== null) continue
     if (el.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-svg-fence]`) !== null) continue
     if (seen.has(el)) continue
     // Message-level containers that happen to carry a surface class must
@@ -392,7 +408,7 @@ function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
     // markdown root holding both a dsh-ui fence and a python block — and
     // the backstop would mislabel that whole container as a fence, hiding
     // every other code block with it (issue #13).
-    if (closestCodeBlockSurface(pre) !== null
+    if (closestCodeBlockSurface(pre, surfaceOwners) !== null
       || pre.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-svg-fence]`) !== null) continue
     const surface = surfaceOf(pre, scope)
     if (surface === null) {
@@ -414,9 +430,10 @@ function findFenceCandidates(scope: ParentNode = document): HTMLElement[] {
     seen.add(surface)
   }
   for (const span of scope.querySelectorAll<HTMLElement>('span')) {
-    if (closestCodeBlockSurface(span) !== null
-      || span.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat-group-part="reasoning"], [data-tool], [data-sidebar-chat], [data-sidebar-right-session], [data-sidebar-right-panel], [data-panel-conversation], [data-plugin-panel]`) !== null) continue
+    // 普通文本不进入祖先和代码块归属查找。
     if (tagTextBodyOf(span) === null) continue
+    if (closestCodeBlockSurface(span, surfaceOwners) !== null
+      || span.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat-group-part="reasoning"], [data-tool], [data-sidebar-chat], [data-sidebar-right-session], [data-sidebar-right-panel], [data-panel-conversation], [data-plugin-panel]`) !== null) continue
     out.push(span)
   }
   return out.sort((left, right) => left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)
