@@ -8,6 +8,7 @@
 - **动效令牌化**：新增 `--dsl-g-dur-fast`（0.15s 控件反馈）/ `--dsl-g-dur-grow`（0.6s 数据生长）/ `--dsl-g-dur-reveal`（0.45s 入场）与统一缓动 `--dsl-g-ease-out`；全部 transition/animation 字面量（0.12s/0.15s/0.18s/0.2s/0.5s/0.6s）按职责归档，`prefers-reduced-motion` 覆盖不变。
 - **交互态统一**：按钮 hover 从 brightness 滤镜迁到主题感知的 4% label wash（以 background-image 叠加，不覆盖 danger/success 底色；primary 单独提亮 accent）；面板头部/关闭/模板按钮的 `rgba(255,255,255,…)` hover 字面量在浅色主题下不可见，改为 `--dsl-g-hover` / `--dsl-g-hover-strong`（新增 8% 强档）；面板切换/模板/关闭按钮补齐 focus-visible 焦点环。
 - **ECharts preset 字号从令牌解析**：gauge 标题/中心值、graph 节点标签三处内嵌死值字号改读 `--dsl-g-font-data/meta/display`（图表容器在 `.block` 内继承令牌；脱离文档渲染回退同值字面量，行为不变）。
+- **视觉 e2e 不再强依赖系统 Chrome**：`e2e-visual.mts` 浏览器解析顺序改为 `E2E_CHROMIUM` 环境变量 → 系统 Chrome → playwright 注册表 → 自动扫描 ms-playwright 缓存中已有的 `chromium-*` 构建（缓存由 agent-browser 等工具安装、构建号与当前库不一致时也可用）；宿主遮罩清理幂等化（`dismissHostOverlays`），在每次真实指针交互前重跑——宿主 React 重渲染会把遮罩重新挂回，曾导致 tooltip 回归超时。注意 `link:` 安装的是 `lib/` 预构建产物，跑视觉回归前需先 `pnpm build`。
 
 ### 修复
 

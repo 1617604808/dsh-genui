@@ -218,5 +218,5 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 2. **根级入场阶梯已存在**：`GenuiBlock.tsx` 根 items 已按 90ms 步进（封顶 720ms）阶梯 reveal。计划中的 grid/row 子级 30ms 阶梯**推迟**：#101 的防重放机制与根包装的 `onAnimationEnd` 耦合，纯 CSS 给子级加动画会重新引入「宿主重插节点时重放入场」的回归面；留待阶段二与 B 层一起评估。
 3. **新发现并修复**：会话面板 chrome（头部/关闭/模板按钮）的 hover 用 `rgba(255,255,255,…)` 字面量，浅色主题下不可见——已迁到 `--dsl-g-hover` / 新增的 `--dsl-g-hover-strong`（8% 档），并补齐三处 focus-visible。
 4. **新增小项**：四个折叠 chevron 字形（detail/group/accordion/file-tree）从 10/11px 混用统一为 11px——图标字形不入字号刻度，但必须彼此一致。
-5. **A5 夹具矩阵未落**：`e2e-visual.mts` 硬编码 `channel: 'chrome'`（2026-09 修复的选择），本机无系统 Chrome 无法真跑；双主题 × 窄列夹具扩展留待有宿主环境时补，属阶段一收尾项。运行命令：`npx tsx scripts/e2e-visual.mts`。
+5. **视觉回归已在无 Chrome 的机器上跑通**（2026-10-14 补）：`e2e-visual.mts` 浏览器解析顺序改为 `E2E_CHROMIUM` → 系统 Chrome → playwright 注册表 → 自动发现 ms-playwright 缓存里已有的 `chromium-*` 构建；遮罩清理幂等化（宿主 React 重渲染会重挂遮罩，须在每次指针交互前重跑）。本机全量 PASS（含 #206 堆叠柱回归、tooltip、流式骨架、按需引擎）。过程中发现两个坑：① `link:` 安装的是 `lib/` 预构建产物而脚本**不自动构建**，本机 lib 曾是 9 月陈旧产物——跑视觉回归前必须先 `pnpm build`；② **双主题 × 560px 窄列夹具矩阵仍未落**（脚本目前只截浅色全页 + 交互态），属阶段一收尾项。
 6. **范围澄清**：TemplateDrawer / PlotBlock / ArtifactExport 三个次级样式表的令牌化不在阶段一（它们是插件 chrome，非模型组件面），挂阶段三 C2 一并处理。
