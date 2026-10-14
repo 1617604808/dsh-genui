@@ -24,7 +24,7 @@ import {
   BADGE_TONES, BUTTON_TONES, CALLOUT_TONES, CARD_TONES, CHART_KINDS, COMPONENT_SCHEMAS, HERO_TONES,
   DIAGRAM_EDGE_KINDS, DIAGRAM_KINDS, DIAGRAM_NODE_TYPES, DIAGRAM_ROUTES, DIAGRAM_VARIANTS,
   ECHART_PRESETS, FILE_TYPES, GENUI_NATIVE_TYPES, GENUI_SPEC_SCHEMA, INPUT_TYPES,
-  MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, TABLE_CELL_TYPES, TEXT_SIZES,
+  MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES,
 } from './genui-runtime/schema.ts'
 import type { ComponentFieldKind, ComponentRecordSchema, ComponentSchema } from './genui-runtime/schema.ts'
 import { normalizeGenuiSpec } from './genui-runtime/normalize.ts'
@@ -270,7 +270,14 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
     case 'text': {
       const content = str(v.content, GENUI_LIMITS.maxString) ?? str(v.text, GENUI_LIMITS.maxString)
       if (content === undefined) return null
-      return { type: 'text', content, ...opt('size', enu(v.size, TEXT_SIZES)), ...opt('center', v.center === true ? true : undefined) }
+      // `center: true` is the legacy shorthand; a display-level size is the
+      // one-per-answer focal tier (B1), so it rides the same enum gate.
+      return {
+        type: 'text', content,
+        ...opt('size', enu(v.size, TEXT_SIZES)),
+        ...opt('align', enu(v.align, TEXT_ALIGNS)),
+        ...opt('center', v.center === true ? true : undefined),
+      }
     }
     case 'row': {
       return { type: 'row', items: repairItems(v.items, ctx, depth + 1), ...opt('wrap', v.wrap === true ? true : undefined), ...opt('spacer', v.spacer === true ? true : undefined) }
@@ -285,6 +292,7 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
       return {
         type: 'card',
         items: repairItems(v.items, ctx, depth + 1),
+        ...opt('eyebrow', str(v.eyebrow, 64)),
         ...opt('title', str(v.title, GENUI_LIMITS.maxString)),
         ...opt('tone', enu(v.tone, CARD_TONES)),
         ...opt('accent', color(v.accent)),
@@ -347,6 +355,7 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
       return {
         type: 'image', src,
         ...opt('alt', str(v.alt, GENUI_LIMITS.maxString)),
+        ...opt('caption', str(v.caption, GENUI_LIMITS.maxString)),
       }
     }
     case 'audio': {
