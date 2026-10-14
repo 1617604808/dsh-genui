@@ -133,8 +133,11 @@ export const gallerySpec: GenuiSpec = {
       { id: 'g', label: 'guard', type: 'backend', x: 312, y: 40, w: 104, h: 44 },
       { id: 's', label: '组件库', type: 'store', x: 456, y: 40, w: 100, h: 44 },
     ], edges: [{ from: 'm', to: 'f' }, { from: 'f', to: 'g' }, { from: 'g', to: 's' }] },
-    { type: 'plot', title: '波动叠加', xMin: -6.28, xMax: 6.28, series: [
-      { expr: 'sin(x)', label: 'sin(x)', color: '#4f8ef7' },
+    { type: 'plot', title: '波动叠加（拖动滑杆即时重绘）', xMin: -6.28, xMax: 6.28, series: [
+      { expr: 'a*sin(b*x)', label: 'a·sin(bx)', color: '#4f8ef7', params: [
+        { name: 'a', value: 1, min: 0.2, max: 2 },
+        { name: 'b', value: 1, min: 0.5, max: 3 },
+      ] },
       { expr: '0.8*cos(x)', label: 'cos', color: '#3ecf8e' },
     ] },
     { type: 'scene3d', title: '几何演示', ambient: 1, meshes: [

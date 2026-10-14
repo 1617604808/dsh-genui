@@ -7,6 +7,13 @@
 - **`divider` 支持 `label`（章节分隔）**：`{"type":"divider","label":"<章节名>"}` 渲染为「线 + 小标签 + 线」的居中章节分隔（meta 字号、次级色、章节级间距），用于报告从摘要切入数据、图表册开新章等场景。`title`/`text` 作为别名归一化到 `label`；超长标签在 repair 中截断到 64 字符，不丢弃节点。无 `label` 时保持原有细线渲染。SKILL.md 同步字段说明与「何时不用」（卡片/列表内部不用，一条回答 ≤3 个）；组件画廊加示例。
 - **SKILL.md 新增「编排范式」节（试点两例）**：「主表明细」（汇总 stat + input 筛选 + table details 钻取，数据问答默认结构）与「结论卡」（指标行 + tone 结论卡 + 行动按钮，分析收尾默认结构），每个带可渲染示例与「何时不用」——清单与示例值依据真实会话采纳审计（`callout+table` 为最高频组合、`table` 为第三大组件）；定位为「验证过的起点不是模板」，与既有「不要照抄组件序列」原则显式衔接。常驻系统提示词加一行触发器（多组件回答先看范式 + divider 章节分隔提示），其余四个范式（封面页/对比页/时间线叙事/测验页）按数据强度后续补齐。
 
+- **SKILL.md「编排范式」补齐全部六例**：新增封面页（hero + display 引言 + 章节 + 三卡摘要 bento）、对比页（tone 卡定性 + 数值表定量）、时间线叙事（timeline + 汇总卡）、测验页（radio 组 + submit 本地判卷）四例；节引言更新为六类场景索引。原定「审计数据后再铺开」的门槛经用户裁定豁免，审计改为合并后单一对比点。
+- **选集美学 B1/B3/B4 三字段**：`text.size:"display"`（引言级大字，v11 display 令牌，一条回答 ≤1）与 `text.align`（`center:true` 旧写法兼容归一化）；`card.eyebrow`（标题上方 meta 大写引题，卡片群章节化用，≤3 个）；`image.caption`（图下方图注；`alt` 保持图上方标签行）。全部经 schema registry 校验/repair/诊断并带测试。
+- **gallerySpec 选集化（C1）**：组件画廊从 50+ 节点零件目录重排为章节化选集（封面→摘要→数据→图表册→叙事与代码→交互→附录·全部词汇），示范 divider 章节、eyebrow、display、caption 等全部新字段；数值感知排序表保持页首 Q1 位，e2e 交互断言继续命中。
+- **GitHub Pages 选集页（C2）**：新增 `scripts/build-anthology-page.mts`——从 gallerySpec 经 artifact 导出管线生成自包含 HTML；部署 workflow 改为源码推送触发 CI 现场构建（8MB 产物不进 git，线上跟随 main）。
+- **README showcase 截图刷新（C3）**：三张真实输出截图从新选集重出（plot 演示补参数滑杆），中英文说明同步。
+- **视觉夹具矩阵（A5）**：`e2e-visual.mts` 新增深色 / 窄列 / 深色窄列三张全页截图，与浅色全页构成 light/dark × wide/narrow 矩阵。
+
 ### 变更（设计系统 v11 · 选集美学纲领阶段一）
 
 - **字号刻度补洞并按归属命名**：新增 `--dsl-g-font-stat`（34，指标卡基础值）/ `--dsl-g-font-stat-hero`（44，单一超大指标）/ `--dsl-g-font-mega`（52，hero 封面大数字）三档——此前 stat 基础值借用 `--dsl-g-font-hero`、44px 与 52px 为游离死值；围栏标题（banner 22px→h1 档 24px，底部间距 18→`--dsl-g-gap-xl` 24px，章节呼吸）、hero 封面标题（20px→h2 档）、环形进度中心值（17px→h3 档）等全部游离字号收进刻度；四个折叠 chevron 字形统一 11px（图标字形不入字号刻度，但彼此一致）。新增 `--dsl-g-gap-xl: 24px` 章节间距档。

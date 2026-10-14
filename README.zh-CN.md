@@ -50,21 +50,21 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 
 <p align="center">
   <img src="./assets/showcase-panel.png" width="92%" alt="真实 DSH 对话中渲染的 dsh-genui 监控面板">
-  <br><em>真实输出：刷新/重置、时间范围、统计卡、图表和服务表都活在助手回答里。</em>
+  <br><em>真实输出：eyebrow 指标卡、可筛选可钻取的服务表、分组合计，以及 spark/ring/bar 单元格类型，都活在助手回答里。</em>
 </p>
 
 #### 2. 改参数时，函数图在本地即时重绘
 
 <p align="center">
   <img src="./assets/showcase-plot.png" width="76%" alt="带可拖动参数滑块的真实 dsh-genui 函数图">
-  <br><em>真实输出：`plot` 绘制曲线；拖动滑块、重置和动画控制都直接更新图形。</em>
+  <br><em>真实输出：`plot` 绘制曲线；拖动参数滑块即时重绘，零模型往返。</em>
 </p>
 
 #### 3. 布局原语可以组成有层级的工作界面
 
 <p align="center">
   <img src="./assets/showcase.png" width="76%" alt="真实 dsh-genui 排版和卡片组件组合">
-  <br><em>真实输出：文字、网格、卡片、行列原语可组合成模型能够声明的界面层级。</em>
+  <br><em>真实输出：display 引言、eyebrow 指标卡、环形进度和带名字的章节分隔线，组合成模型能够声明的界面层级。</em>
 </p>
 
 ---

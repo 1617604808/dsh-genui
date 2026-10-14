@@ -234,3 +234,19 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 - SKILL.md 新增「编排范式」节（试点两例，各带可渲染示例 + 何时不用），定位写明「验证过的起点不是模板」，与既有「不要照抄」原则衔接；示例围栏受 `tests/genui-skill-examples.spec.ts` 全管线校验。
 - 系统提示词加一行触发器（挂在该节既有的组合建议行之后）。
 - 待办：合并发布后两周跑 `genui-usage-audit.mjs` 前后对比（divider.label 采用率、范式命中率、junk 告警率、版式熵）；数据支持再铺开其余四个范式。
+
+---
+
+## 12. 阶段二完成 + 阶段三实施记录（2026-10-14，分支 `feat/anthology-complete`）
+
+用户裁定（2026-10-14）：**「倒是全做啊」**——原定「其余范式等审计数据再铺开」的门槛豁免，审计改为合并后单一对比点。本批落地：
+
+- **B1/B3/B4 三字段**：`text.size:"display"`（v11 display 令牌开放给词汇）+ `text.align`（旧 `center:true` 兼容归一化）；`card.eyebrow`（heroLabel 同款 meta 大写引题）；`image.caption`（图下图注，`alt` 保持图上标签行）。全部走 registry（枚举校验/repair 截断/unknown-field 边界）+ SKILL「何时不用」+ 测试。
+- **B5 完成**：封面页（hero+display+divider+三卡 bento）/对比页（tone 卡定性+数值表定量）/时间线叙事/测验页（radio 组+submit 本地判卷）四范式入 SKILL，节引言更新为六类场景索引。
+- **A5 完成**：e2e-visual 新增三张夹具（gallery-dark / gallery-narrow / gallery-dark-narrow），与 gallery.png 构成 light/dark × wide/narrow 矩阵。
+- **C1 完成**：gallerySpec 从 50+ 节点零件目录重排为章节化选集（封面→摘要→数据→图表册→叙事与代码→交互→附录·全部词汇）；数值感知排序表保持页首 Q1 位（e2e sort 断言依赖）；测试断言同步（章节分隔→图表册）。
+- **C2 完成**：`createStandaloneHtmlDocument` 本就是纯函数（bundles Map 注入），无需重构；新增 `scripts/build-anthology-page.mts`（node 从 lib/assets 读 bundles）+ 部署 workflow 改为 CI 现场构建——8MB 自包含产物不进 git，线上永远跟随 main。本机 file:// 验证挂载正常。
+- **C3 完成**：三张 README showcase 截图从新选集重出（真实宿主+浏览器渲染），中英文说明同步（plot 演示补了参数滑杆，配得上「拖动滑块即时重绘」的文案）。
+- **C4 基线存档**（2026-10-14，`genui-usage-audit.mjs --days 30`）：396 会话 / 8,892 助手文本块 / 929 围栏；长回答带围栏率 63.3%；解析失败 7.1%（上限）；版式签名 250 种 / 最高频占 10.7% / 归一化熵 0.83；hero 使用率 0.9%；card 11%；Top 组合 callout+table(73)、plot(45)、callout+keyvalue(41)。**合并发布后 ≥2 周用同命令复测，对比：围栏采纳率、六范式命中率、divider.label 采用率、版式熵变化。**
+
+阶段状态：**三阶段全部完成**（阶段一遗留的 A5 已补齐）。
