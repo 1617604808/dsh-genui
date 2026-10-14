@@ -147,10 +147,12 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 - 每章有取舍（图表册精选，不全量堆砌）；低频组件不删除，降级进附录——**目录职能保留，叙事职能新增**。
 - 继续作为规范围栏：测试（genui-gallery.spec.tsx）、文档、README 截图、e2e 视觉夹具共用这一份 spec。
 
-### C2 模板中心升级
+### C2 GitHub Pages 选集页（2026-10-14 定：模板中心方案砍掉，样板改放公开站点）
 
-- 模板预览自动随 A 层受益（同一渲染器）；为 6 个 B5 范式各加一个模板（instruction = 范式触发语，demo = 范式最小示例）——模板中心成为范式教学面。
-- 类别 id 稳定不迁移（`TEMPLATE_CATEGORIES` 七类保持），新增范式挂靠现有类别或加 `anthology` 类（i18n 字典补 key）。
+- **机制**：C1 重排后的 `gallerySpec` 由构建脚本经 `createStandaloneHtmlDocument`（`src/client/artifact/html.ts`）生成独立 HTML，提交到 `site/`——现有 `deploy-product-site.yml` 对 `site/**` 自动部署 Pages，零新增基建。人在 `https://omdsh-dev.github.io/dsh-genui/` 直接看选集，不依赖 DSH 宿主。
+- **一处小重构**：`html.ts` 取 bundle 走浏览器 `fetch`；构建脚本在 node 里跑，需把「bundle 字节来源」抽成可注入（浏览器 fetch / node 读 `lib/assets/*` 与 runtime 产物）。
+- **单一事实源**：选集页、回归测试（genui-gallery.spec.tsx）、README 截图（e2e-visual）、公开页面全部消费同一份 `gallerySpec`——改一处四处同步。
+- 模板中心（TemplateDrawer）不加范式模板（用户裁定没必要）；其既有七类模板与令牌化收口另行择机，不挂在本纲领。
 
 ### C3 README 与站点证据刷新
 
@@ -182,7 +184,7 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 |---|---|---|---|
 | 一（渲染层 v11） | A1–A6，纯 CSS/令牌，无 schema 变更 | 0.13.0 | 无 |
 | 二（词汇层） | B1–B4（小步独立合并，每字段一个 PR）+ B5/B6（SKILL）+ B7 | 0.13.x / 0.14.0 | 阶段一的令牌位 |
-| 三（选集层） | C1 → C2 → C3 → C4 | 0.14.0 | B2/B3 落地（画廊分章需要 divider.label/eyebrow） |
+| 三（选集层） | C1（画廊选集化）→ C2（Pages 选集页）→ C3（README 截图）→ C4（前后审计） | 0.14.0 | B2/B3 落地（画廊分章需要 divider.label/eyebrow） |
 
 每阶段独立可发布、独立可回滚；阶段一合入后模板中心/全部既有围栏立即受益。
 
@@ -219,4 +221,4 @@ hero 封面 → divider「摘要」→ 三 stat bento → divider「数据」→
 3. **新发现并修复**：会话面板 chrome（头部/关闭/模板按钮）的 hover 用 `rgba(255,255,255,…)` 字面量，浅色主题下不可见——已迁到 `--dsl-g-hover` / 新增的 `--dsl-g-hover-strong`（8% 档），并补齐三处 focus-visible。
 4. **新增小项**：四个折叠 chevron 字形（detail/group/accordion/file-tree）从 10/11px 混用统一为 11px——图标字形不入字号刻度，但必须彼此一致。
 5. **视觉回归已在无 Chrome 的机器上跑通**（2026-10-14 补）：`e2e-visual.mts` 浏览器解析顺序改为 `E2E_CHROMIUM` → 系统 Chrome → playwright 注册表 → 自动发现 ms-playwright 缓存里已有的 `chromium-*` 构建；遮罩清理幂等化（宿主 React 重渲染会重挂遮罩，须在每次指针交互前重跑）。本机全量 PASS（含 #206 堆叠柱回归、tooltip、流式骨架、按需引擎）。过程中发现两个坑：① `link:` 安装的是 `lib/` 预构建产物而脚本**不自动构建**，本机 lib 曾是 9 月陈旧产物——跑视觉回归前必须先 `pnpm build`；② **双主题 × 560px 窄列夹具矩阵仍未落**（脚本目前只截浅色全页 + 交互态），属阶段一收尾项。
-6. **范围澄清**：TemplateDrawer / PlotBlock / ArtifactExport 三个次级样式表的令牌化不在阶段一（它们是插件 chrome，非模型组件面），挂阶段三 C2 一并处理。
+6. **范围澄清**：TemplateDrawer / PlotBlock / ArtifactExport 三个次级样式表的令牌化不在阶段一（它们是插件 chrome，非模型组件面）；TemplateDrawer 本身不加范式模板（2026-10-14 用户裁定，样板改放 GitHub Pages），其令牌化另行择机。
