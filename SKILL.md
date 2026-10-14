@@ -30,7 +30,7 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 - span: 任意节点都可加 `"span":2`（grid 子节点占几列）——bento 排版的唯一原语：一张 `span:2` 宽卡配一张窄卡，比一列方块堆下去好看得多
 - card: `{"type":"card","title":"...","items":[...]}`；`"accent":"#f59e0b"` 指定强调色（边框 + 标题 + 极淡底色）
 - palette: `chart` / `echart` 都支持 `"palette":["#ff8800","#3ecf8e"]` 覆盖分类色板（默认跟随宿主主题）。**只有语义上需要指定颜色时才写**（成本=红、收益=绿），否则跟随主题更稳；`"tone":"info|success|warning|danger"` 给卡片底色（用于结论卡/风险卡）
-- divider: `{"type":"divider"}`; spacer: `{"type":"spacer"}`
+- divider: `{"type":"divider"}`；**带章节名** `{"type":"divider","label":"<user-language 章节名>"}`（线 + 小标签居中，作章节切换：报告从摘要切入数据、图表册开新章时用一段；卡片/列表内部、连续同主题内容之间**不要用**，一条回答 ≤3 个）; spacer: `{"type":"spacer"}`
 
 ### 展示
 - stat: `{"type":"stat","label":"...","value":"...","delta":"+12.4%|-3%"}`（`-` 开头自动红、`+` 绿）；可选 `"spark":[3,5,4,8,6]` 画一条微趋势线（2–60 个有限数值）；`"size":"hero"` 渲染超大数字（一条回答最多用一次，作为视觉锚点）
@@ -232,6 +232,30 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 > 这个改动我先不做了——它要动宿主的输入组件，而你说了不碰宿主。
 
 不要这样：一句话的结论配 stat + 表格 + callout。**没有内容就不发组件，这是对的，不算漏发。**
+
+## 编排范式：高频场景的默认起点
+
+范式是**验证过的起点，不是模板**：判断永远优先（上一节的「不要照抄」同样适用于范式），但真实会话审计显示这两类场景模型反复在排（`callout+table` 是最高频组合、`table` 是第三大组件）——与其每次重想，不如从成套结构出发、按需增删。范式之外的场景自由组合。
+
+### 主表明细（数据问答的默认结构）
+
+适用：用户问的数据要「先看总量 → 再筛 → 再钻某一行」。
+
+```json dsh-ui
+{"items":[{"type":"grid","cols":2,"items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>","delta":"+3.1%"},{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]},{"type":"input","label":"<user-language filter>","placeholder":"<user-language hint>","id":"master-filter"},{"type":"table","filter":"master-filter","columns":["<user-language column>","<user-language column>","<user-language column>"],"types":["text","num","badge"],"rows":[["<user-language text>","128","<user-language status>"],["<user-language text>","190","<user-language status>"],["<user-language text>","250","<user-language status>"]],"details":[[{"type":"keyvalue","pairs":[{"key":"<user-language key>","value":"<user-language value>"}]}],null,[{"type":"progress","value":91,"target":80,"label":"<user-language metric>"}]]}]}
+```
+
+何时不用：行数 ≤5 不要配 `filter`；没有逐行明细可展开就别配 `details`；展开行里只放该行自己的信息，不要塞与该行无关的图表。
+
+### 结论卡（分析收尾的默认结构）
+
+适用：指标 + 一个明确判断 + 可执行的下一步（周报结论、复盘、健康度检查）。
+
+```json dsh-ui
+{"items":[{"type":"grid","cols":3,"items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>","delta":"+2.4%"},{"type":"stat","label":"<user-language metric>","value":"<user-language value>"},{"type":"stat","label":"<user-language metric>","value":"<user-language value>","delta":"-1.2%"}]},{"type":"card","tone":"success","title":"<user-language title>","items":[{"type":"text","size":"body","content":"<user-language text>"},{"type":"progress","value":72,"target":80,"label":"<user-language metric>","valueLabel":"72%"}]},{"type":"row","items":[{"type":"button","label":"<user-language action>","tone":"primary","action":"<action-name>"},{"type":"button","label":"<user-language action>","tone":"ghost","action":"<action-name>"}]}]}
+```
+
+何时不用：结论还不成立时不要硬造结论卡（先摆数据，让读者自己看）；没有真实可执行的下一步就不要放按钮；`tone` 只有在确实传递语义（好/坏/险）时才用。
 
 ## 使用规则
 

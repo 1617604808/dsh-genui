@@ -2,8 +2,22 @@
 
 ## [Unreleased]
 
+### 新增（选集美学纲领阶段二 · B2 试点）
+
+- **`divider` 支持 `label`（章节分隔）**：`{"type":"divider","label":"<章节名>"}` 渲染为「线 + 小标签 + 线」的居中章节分隔（meta 字号、次级色、章节级间距），用于报告从摘要切入数据、图表册开新章等场景。`title`/`text` 作为别名归一化到 `label`；超长标签在 repair 中截断到 64 字符，不丢弃节点。无 `label` 时保持原有细线渲染。SKILL.md 同步字段说明与「何时不用」（卡片/列表内部不用，一条回答 ≤3 个）；组件画廊加示例。
+- **SKILL.md 新增「编排范式」节（试点两例）**：「主表明细」（汇总 stat + input 筛选 + table details 钻取，数据问答默认结构）与「结论卡」（指标行 + tone 结论卡 + 行动按钮，分析收尾默认结构），每个带可渲染示例与「何时不用」——清单与示例值依据真实会话采纳审计（`callout+table` 为最高频组合、`table` 为第三大组件）；定位为「验证过的起点不是模板」，与既有「不要照抄组件序列」原则显式衔接。常驻系统提示词加一行触发器（多组件回答先看范式 + divider 章节分隔提示），其余四个范式（封面页/对比页/时间线叙事/测验页）按数据强度后续补齐。
+
+### 变更（设计系统 v11 · 选集美学纲领阶段一）
+
+- **字号刻度补洞并按归属命名**：新增 `--dsl-g-font-stat`（34，指标卡基础值）/ `--dsl-g-font-stat-hero`（44，单一超大指标）/ `--dsl-g-font-mega`（52，hero 封面大数字）三档——此前 stat 基础值借用 `--dsl-g-font-hero`、44px 与 52px 为游离死值；围栏标题（banner 22px→h1 档 24px，底部间距 18→`--dsl-g-gap-xl` 24px，章节呼吸）、hero 封面标题（20px→h2 档）、环形进度中心值（17px→h3 档）等全部游离字号收进刻度；四个折叠 chevron 字形统一 11px（图标字形不入字号刻度，但彼此一致）。新增 `--dsl-g-gap-xl: 24px` 章节间距档。
+- **动效令牌化**：新增 `--dsl-g-dur-fast`（0.15s 控件反馈）/ `--dsl-g-dur-grow`（0.6s 数据生长）/ `--dsl-g-dur-reveal`（0.45s 入场）与统一缓动 `--dsl-g-ease-out`；全部 transition/animation 字面量（0.12s/0.15s/0.18s/0.2s/0.5s/0.6s）按职责归档，`prefers-reduced-motion` 覆盖不变。
+- **交互态统一**：按钮 hover 从 brightness 滤镜迁到主题感知的 4% label wash（以 background-image 叠加，不覆盖 danger/success 底色；primary 单独提亮 accent）；面板头部/关闭/模板按钮的 `rgba(255,255,255,…)` hover 字面量在浅色主题下不可见，改为 `--dsl-g-hover` / `--dsl-g-hover-strong`（新增 8% 强档）；面板切换/模板/关闭按钮补齐 focus-visible 焦点环。
+- **ECharts preset 字号从令牌解析**：gauge 标题/中心值、graph 节点标签三处内嵌死值字号改读 `--dsl-g-font-data/meta/display`（图表容器在 `.block` 内继承令牌；脱离文档渲染回退同值字面量，行为不变）。
+- **视觉 e2e 不再强依赖系统 Chrome**：`e2e-visual.mts` 浏览器解析顺序改为 `E2E_CHROMIUM` 环境变量 → 系统 Chrome → playwright 注册表 → 自动扫描 ms-playwright 缓存中已有的 `chromium-*` 构建（缓存由 agent-browser 等工具安装、构建号与当前库不一致时也可用）；宿主遮罩清理幂等化（`dismissHostOverlays`），在每次真实指针交互前重跑——宿主 React 重渲染会把遮罩重新挂回，曾导致 tooltip 回归超时。注意 `link:` 安装的是 `lib/` 预构建产物，跑视觉回归前需先 `pnpm build`。
+
 ### 修复
 
+- **`validate_dsh_ui` 不再把 `divider`/`spacer` 误报为未知类型**：发前校验的手写类型清单漏了这两个无必填字段的组件，任何包含它们的围栏走 `validate_dsh_ui` 都返回 "unknown type" 并要求模型修改（渲染管线按契约过滤该误报，所以线上渲染未受影响，但发前校验对这两类围栏一直是坏的）。divider.label 的 schema 测试暴露了这个问题；现在两者在校验 switch 中显式放行，字段类型检查仍由 schema registry 覆盖。
 - **#298 方向 A:政策性截断不再导致整条围栏被拒**。guard 的 tabs ≤12 / accordion ≤24 截断与围栏级「声明数 vs 渲染数」校验（#42）此前互相抵消——截断丢弃的节点被计为缺陷,超限 tabs 让整条围栏降级成代码块并触发纠错重发,截断路径实际是死路。现在声明计数器应用与 repair 相同的家族上限:政策截断的节点不计入「消失」账目,围栏截断后照常渲染;与既有的两类豁免（全局 200 节点预算的 intentional-cut、超深链的剪枝二次校验）行为一致。模型侧新增 `policy_truncated` 教学警告（`validate_dsh_ui` 输出,不触发纠错）,提示拆分组件;SKILL.md 使用规则同步注明 tabs/accordion 上限。
 
 ### 修复

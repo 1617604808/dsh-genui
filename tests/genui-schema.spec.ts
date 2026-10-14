@@ -121,6 +121,23 @@ describe('GenUI runtime schema normalization', () => {
     ])
   })
 
+  it('carries the divider label through validation, aliases, and repair', () => {
+    expect(validateGenuiSpec({ items: [{ type: 'divider', label: '数据' }] }).ok).toBe(true)
+    expect(repairGenuiSpec({ items: [{ type: 'divider', label: '数据' }] })?.items[0])
+      .toEqual({ type: 'divider', label: '数据' })
+    // `title`/`text` normalize onto `label` with the stable alias warning.
+    const normalized = normalizeGenuiSpec({ items: [{ type: 'divider', title: '数据' }] })
+    expect(normalized.value).toEqual({ items: [{ type: 'divider', label: '数据' }] })
+    expect(normalized.warnings.map(warning => [warning.path, warning.field, warning.canonical]))
+      .toEqual([['items[0].title', 'title', 'label']])
+    // Overlong labels truncate in repair instead of dropping the node.
+    expect((repairGenuiSpec({ items: [{ type: 'divider', label: '标'.repeat(80) }] })?.items[0] as { label?: string }).label)
+      .toHaveLength(64)
+    // Undeclared fields on divider still surface as unknown-field diagnostics.
+    expect(diagnoseUnknownGenuiFields({ items: [{ type: 'divider', typo: 1 }] }))
+      .toMatchObject([{ path: 'items[0].typo', field: 'typo', type: 'divider' }])
+  })
+
   it('normalizes aliases inside renderer-reachable table details before submission validation', () => {
     const raw = { items: [
       { type: 'table', columns: ['项目'], rows: [['A']], details: [[{ type: 'select', id: 'choice', items: ['A', 'B'] }]] },
