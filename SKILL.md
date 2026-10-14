@@ -235,7 +235,7 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 
 ## 编排范式：高频场景的默认起点
 
-范式是**验证过的起点，不是模板**：判断永远优先（上一节的「不要照抄」同样适用于范式），但真实会话审计显示这两类场景模型反复在排（`callout+table` 是最高频组合、`table` 是第三大组件）——与其每次重想，不如从成套结构出发、按需增删。范式之外的场景自由组合。
+范式是**验证过的起点，不是模板**：判断永远优先（上一节的「不要照抄」同样适用于范式）。六个范式各管一类高频场景——**数据问答**用「主表明细」、**分析收尾**用「结论卡」、**报告开篇**用「封面页」、**方案权衡**用「对比页」、**过程复盘**用「时间线叙事」、**教学自测**用「测验页」。从成套结构出发、按需增删；范式之外的场景自由组合。
 
 ### 主表明细（数据问答的默认结构）
 
@@ -256,6 +256,46 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 ```
 
 何时不用：结论还不成立时不要硬造结论卡（先摆数据，让读者自己看）；没有真实可执行的下一步就不要放按钮；`tone` 只有在确实传递语义（好/坏/险）时才用。
+
+### 封面页（报告开篇的默认结构）
+
+适用：正式报告/复盘/评审材料的**第一屏**——一个大数字定调，一句引言点题，三张摘要卡预告正文。
+
+```json dsh-ui
+{"items":[{"type":"hero","label":"<user-language metric>","value":"99.96%","delta":"+0.02%","tone":"accent","title":"<user-language title>","subtitle":"<user-language text>"},{"type":"text","size":"display","content":"<user-language statement>"},{"type":"divider","label":"<user-language chapter>"},{"type":"grid","cols":3,"items":[{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]}]}]}
+```
+
+何时不用：短回答不需要封面（hero 已是唯一焦点，再加 `display` 就是两个焦点）；hero 与 `display` 同屏时，后面不要再出现 h1 级大标题；普通问答直接给答案，不要套封面。
+
+### 对比页（方案权衡的默认结构）
+
+适用：两个（至多三个）方案/版本/选型的正面对决——定性取舍进卡，定量差异进表。
+
+```json dsh-ui
+{"items":[{"type":"grid","cols":2,"items":[{"type":"card","tone":"success","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]},{"type":"card","tone":"warning","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]}]},{"type":"table","columns":["<user-language column>","<user-language column>","<user-language column>"],"types":["text","num","num"],"rows":[["<user-language text>","8","12"],["<user-language text>","5","9"]]}]}
+```
+
+何时不用：只有单一方案时就是普通陈述，不要硬摆两张卡假装权衡；卡与表要承载**不同粒度**（卡给取舍理由、表给数值对比），两边复制同一批数字就是重复表达。
+
+### 时间线叙事（过程复盘的默认结构）
+
+适用：有先后顺序的过程/事故/迭代叙事——时间线主叙事，收尾一张卡给汇总结论。
+
+```json dsh-ui
+{"items":[{"type":"timeline","items":[{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"},{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"},{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"keyvalue","pairs":[{"key":"<user-language key>","value":"<user-language value>"},{"key":"<user-language key>","value":"<user-language value>"}]}]}]}
+```
+
+何时不用：两步以内的小流程用正文一句话讲清；纯日志列举不要套卡，`timeline` 单独就够。
+
+### 测验页（教学自测的默认结构）
+
+适用：教学/检查理解——两题以上的成组测验，radio 组带答案与解析，`submit` 聚合交卷本地判卷。
+
+```json dsh-ui
+{"items":[{"type":"radio","label":"<user-language question>","group":"q1","options":["<user-language option>","<user-language option>","<user-language option>"],"answer":1,"explanation":"<user-language explanation>"},{"type":"radio","label":"<user-language question>","group":"q2","options":["<user-language option>","<user-language option>"],"answer":0,"explanation":"<user-language explanation>"},{"type":"submit","label":"<user-language action>","action":"grade","groups":["q1","q2"]}]}
+```
+
+何时不用：单一知识点用单个 `radio`（自带本地判卷）或 `quiz` 组件，不需要 submit 组卷；题目多于 5 个拆成多条回答分批发。
 
 ## 使用规则
 
