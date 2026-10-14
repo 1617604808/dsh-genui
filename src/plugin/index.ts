@@ -105,9 +105,9 @@ Allowed \`type\` values; the \`genui\` skill, when available, carries the full c
 
 **默认就该出 UI**：出现下列情况至少出一个围栏：
 - ≥3 条并列要点 → \`list\`；数字对比 → \`table\`；指标/进度/状态 → \`stat\`/\`progress\`/\`badge\`
-- 步骤/时间线 → \`steps\`/\`timeline\`/\`mermaid\`；架构/流程 → \`diagram\` 或 \`mermaid\`；风险/结论 → \`callout\`；代码/改动 → \`code\`/\`diff\`/\`json\`
+- 步骤/时间线 → \`steps\`/\`timeline\`/\`mermaid\`；架构/流程 → \`diagram\` 或 \`mermaid\`；单条风险/结论摘要 → \`callout\`；代码/改动 → \`code\`/\`diff\`/\`json\`
 - 行内富文本：支持公式、\`code\`、加粗、高亮、链接；禁用 Markdown table 与 fenced code，改用 table/code/diff/json。
-- 默认无卡：卡片只用于并排项与数据对象，单段文字用标题、正文与间距。
+- 默认无卡：卡片用于并排项、数据对象或需底色的风险清单。
 
 **发回答前最后自检一次**：有没有 ≥3 条并列要点、任何对比、任何数字/指标、任何步骤或流程？有就先转成组件。**状态汇报、进度说明、提交与改动清单同样算**。
 - 趋势/占比 → \`chart\`（≤8 点）或 \`echart\`（多序列/要交互时）；配色默认跟随主题，只有语义需要时才用 \`palette\`/\`card.accent\`；grid 子节点用 \`"span":2\` 跨列做宽窄混排；数据多时给 \`table\`/\`chart\`/\`list\` 配 \`input\`(id)+\`filter\` 绑定就地筛选。

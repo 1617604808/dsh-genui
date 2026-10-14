@@ -28,8 +28,8 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 - grid: `{"type":"grid","cols":n,"items":[...]}`
 - hero: `{"type":"hero","title":"<user-language title>","subtitle":"<user-language text>","value":"99.96%","label":"<user-language metric>","delta":"+0.02%","spark":[...],"tone":"accent|success|warning|danger"}` — **封面块**：eyebrow + 超大数字（52px，带入场计数）+ 标题 + 副标题 + tone 渐变底色。**一条回答最多用一个**，放在最前面当视觉锚点
 - span: 任意节点都可加 `"span":2`（grid 子节点占几列）——bento 排版的唯一原语：一张 `span:2` 宽卡配一张窄卡，比一列方块堆下去好看得多
-- card: `{"type":"card","title":"...","items":[...]}`；`"accent":"#f59e0b"` 指定强调色（边框 + 标题 + 极淡底色）；`"eyebrow":"<user-language 小引题>"` 在标题上方加一行 meta 小字（把多张卡分章时用——**连续同章的卡片不要每张都加**，一段回答 ≤3 个）
-- palette: `chart` / `echart` 都支持 `"palette":["#ff8800","#3ecf8e"]` 覆盖分类色板（默认跟随宿主主题）。**只有语义上需要指定颜色时才写**（成本=红、收益=绿），否则跟随主题更稳；`"tone":"info|success|warning|danger"` 给卡片底色（用于结论卡/风险卡）
+- card: `{"type":"card","title":"...","items":[...]}`；`"tone":"info|success|warning|danger"` 给卡片语义底色（用于结论卡/风险卡）；`"accent":"#f59e0b"` 指定强调色（边框 + 标题 + 极淡底色）；`"eyebrow":"<user-language 小引题>"` 在标题上方加一行 meta 小字（把多张卡分章时用——**连续同章的卡片不要每张都加**，一段回答 ≤3 个）
+- palette: `chart` / `echart` 都支持 `"palette":["#ff8800","#3ecf8e"]` 覆盖分类色板（默认跟随宿主主题）。**只有语义上需要指定颜色时才写**（成本=红、收益=绿），否则跟随主题更稳
 - divider: `{"type":"divider"}`；**带章节名** `{"type":"divider","label":"<user-language 章节名>"}`（线 + 小标签居中，作章节切换：报告从摘要切入数据、图表册开新章时用一段；卡片/列表内部、连续同主题内容之间**不要用**，一条回答 ≤3 个）; spacer: `{"type":"spacer"}`
 
 ### 展示
@@ -49,7 +49,7 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 - diff: `{"type":"diff","diffs":[{"path":"...","oldText":"..."|null,"newText":"..."}]}`
 - json: `{"type":"json","value":...}`（JSON 树查看器）
 - code: `{"type":"code","lang":"ts","code":"..."}`
-- callout: `{"type":"callout","tone":"info|success|warning|error","title":"...","content":"..."}`
+- callout: `{"type":"callout","tone":"info|success|warning|error","title":"...","content":"..."}` — 用于单条强调、提醒或风险摘要；`content` 是文本字符串，可用 JSON `"\n"` 分行。多条独立事项用 `list` 的 `{title,desc}` 保留逐项层次
 - steps: `{"type":"steps","current":n,"steps":[{"title":"...","desc":"..."}]}`
 
 ### 图表
@@ -94,14 +94,15 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 
 **硬触发（出现就至少出一个围栏，不要退回纯文字段落）**：
 - ≥3 条并列要点 → `list`；≥2 组数字对比 → `table`；指标/进度/状态 → `stat`/`progress`/`badge`
-- 步骤/时间线 → `steps`/`timeline`/`mermaid`；架构/流程 → `diagram`/`mermaid`；风险/结论 → `callout`；代码/改动 → `code`/`diff`/`json`
+- 步骤/时间线 → `steps`/`timeline`/`mermaid`；架构/流程 → `diagram`/`mermaid`；单条风险/结论摘要 → `callout`；代码/改动 → `code`/`diff`/`json`
 - 趋势/占比 → `chart`（≤8 点）或 `echart`（多序列/要交互/数据量大）
 - 收尾自检：回答超过约 10 行时确认至少有一个围栏；同一份信息不要既写文字又重复出组件；纯问答不套 UI。
 
 | 你要呈现的内容 | 用这些组件 |
 |---|---|
-| 关键结论 / 要点罗列（≥2 条） | `list`、`keyvalue`、`callout` |
-| 重点强调 / 警告 / 注意事项 | `callout`（info/success/warning/error）、`badge`、`stat` |
+| 并列结论 / 要点罗列（≥2 条） | `list`、`keyvalue` |
+| 单条重点强调 / 警告 / 注意事项 | `callout`（info/success/warning/error）、`badge`、`stat` |
+| 多项风险 / 注意事项 | `list`；需要统一风险底色时用 `card.tone` + `list` |
 | 数据对比 / 趋势 / 占比 | `chart`（bars/line/donut）、`echart`（ECharts 全功能）、`table` |
 | 关键指标数字 / 进度状态 | `stat`、`progress`、`badge` |
 | 回答的视觉锚点（第一个组件） | `hero`（封面块，一条回答最多一个） |
@@ -119,6 +120,12 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 | 数学函数 / 曲线关系 | `plot`（可带参数滑块、动画） |
 | 需要用户操作 / 筛选 / 反馈 | `button`、`input`、`select`、`checkbox`、`radio`、`switch`、`tabs` |
 | 3D 物体 / 空间布局 | `scene3d` |
+
+多项风险需要统一底色时，复用 `card` 包含 `list`；普通要点直接用 `list`。卡片的严重风险色是 `danger`，提示框对应的是 `error`。
+
+```json dsh-ui
+{"items":[{"type":"card","tone":"warning","title":"<user-language risk summary>","items":[{"type":"list","items":[{"title":"<user-language item title>","desc":"<user-language description>"},{"title":"<user-language item title>","desc":"<user-language description>"},{"title":"<user-language item title>","desc":"<user-language description>"}]}]}]}
+```
 
 **别用的情况**：一句话能说清的事、纯闲聊、用户明确说不要 UI、以及"为了炫技硬塞"——组件服务内容，不是内容服务组件。
 
@@ -150,12 +157,13 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 2. **焦点唯一**：一条回答只有一个视觉焦点（最大那张图或那组数字）；其余组件的视觉权重必须明显更低，靠尺寸/位置/色彩强度拉开，**不是靠数组件个数**。
 3. **不重复**：同一批数据不做两种表达（表格与图表二选一）。
 
-### 卡片（`card`）只在两种场合用
+### 卡片（`card`）只在有明确用途时用
 
 - 需要**并排**的 `grid` 子项（没有边界就分不清内容归属）；
-- 承载**数据对象**：表格、图、keyvalue、指标组。
+- 承载**数据对象**：表格、图、keyvalue、指标组；
+- 同组风险需要**统一语义底色**：`card.tone` 包含 `list`，保留逐项标题与说明。
 
-单段文字、单个列表、已经自带边界的表格/图表，**不要包卡**。用 `h3` 标题 + 正文 + 间距代替。
+普通单段文字、普通列表、已经自带边界的表格/图表，**不要包卡**。用 `h3` 标题 + 正文 + 间距代替。
 
 ### 层级靠字，不靠框
 
