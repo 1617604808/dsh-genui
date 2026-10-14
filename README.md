@@ -50,21 +50,21 @@ The walkthrough moves from an answer-embedded panel through forms, plotting, Mer
 
 <p align="center">
   <img src="./assets/showcase-panel.png" width="92%" alt="Real dsh-genui monitoring panel rendered inside a DSH conversation">
-  <br><em>Real output: refresh/reset controls, time-range selection, statistics, charts, and a service table live inside the assistant reply.</em>
+  <br><em>Real output: eyebrow stat cards, a filterable service table with drill-down rows, grouped totals, and spark/ring/bar cell types live inside the assistant reply.</em>
 </p>
 
 #### 2. A function plot redraws locally as its parameters change
 
 <p align="center">
   <img src="./assets/showcase-plot.png" width="76%" alt="Real dsh-genui function plot with draggable parameter sliders">
-  <br><em>Real output: `plot` renders curves while sliders, reset, and animation controls update the graph locally.</em>
+  <br><em>Real output: `plot` renders curves while parameter sliders update the graph locally — drag to redraw, no round-trip.</em>
 </p>
 
 #### 3. Layout primitives compose into structured work surfaces
 
 <p align="center">
   <img src="./assets/showcase.png" width="76%" alt="Real dsh-genui layout and card component composition">
-  <br><em>Real output: typography, grid, card, and row/column primitives combine into a hierarchy the model can describe declaratively.</em>
+  <br><em>Real output: display typography, eyebrow stat cards, a ring progress, and labeled chapter dividers combine into a hierarchy the model can describe declaratively.</em>
 </p>
 
 ---

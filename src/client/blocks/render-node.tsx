@@ -205,8 +205,10 @@ export function renderNode(
   switch (node.type) {
     case 'text': {
       const size = node.size ?? 'body'
+      // `align` is canonical; legacy `center: true` maps to the center class.
+      const alignClass = node.align === undefined ? (node.center ? ` ${css.center}` : '') : ` ${css[node.align] ?? ''}`
       return (
-        <div key={key} className={`${css.text} ${css[size]}` + (node.center ? ` ${css.center}` : '')}>
+        <div key={key} className={`${css.text} ${css[size]}${alignClass}`}>
           {renderInline(node.content)}
         </div>
       )
@@ -256,6 +258,7 @@ export function renderNode(
       } as CSSProperties
       return (
         <div key={key} className={`${css.card}${toneClass}`} style={accentStyle}>
+          {node.eyebrow !== undefined && <div className={css.cardEyebrow}>{renderInline(node.eyebrow)}</div>}
           {node.title !== undefined && <div className={css.cardTitle}>{renderInline(node.title)}</div>}
           {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers))}
         </div>

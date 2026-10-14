@@ -230,6 +230,17 @@ body[data-ds-dark-theme] .panel {
   color: var(--dsw-alias-label-secondary);
 }
 
+/* Card eyebrow (`card.eyebrow`, B3): the heroLabel language on a card — meta
+   uppercase overline for chaptering a card GROUP. Sparingly: not every card
+   in a row carries one. */
+.cardEyebrow {
+  font-size: var(--dsl-g-font-meta);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 /* ---------- text ---------- */
 
 .text { color: var(--dsw-alias-label-primary); white-space: pre-line; }
@@ -253,7 +264,17 @@ body[data-ds-dark-theme] .panel {
 .text.body { font-size: var(--dsl-g-font-body); line-height: 1.7; color: var(--dsw-alias-label-primary); text-wrap: pretty; max-width: 68ch; }
 .text.muted { font-size: var(--dsl-g-font-title); line-height: 1.65; color: var(--dsw-alias-label-secondary); }
 .text.caption { font-size: var(--dsl-g-font-meta); line-height: 1.6; color: var(--dsw-alias-label-secondary); }
+/* Display: the one-per-answer focal line (B1) — bigger than h1, carries the
+   opening statement of a report; vocabulary lives on the v11 scale. */
+.text.display {
+  font-size: var(--dsl-g-font-display);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
 .text.center { text-align: center; }
+.text.left { text-align: left; }
+.text.right { text-align: right; }
 
 /* ---------- controls ---------- */
 
@@ -376,6 +397,14 @@ body[data-ds-dark-theme] .panel {
   border-radius: var(--dsl-g-radius-surface);
 }
 .mediaLabel { font-size: var(--dsl-g-font-title); font-weight: 600; color: var(--dsw-alias-label-primary); }
+/* Image caption (`image.caption`, B4): the magazine note UNDER the picture —
+   source, reading or credit; quieter and smaller than the alt label above. */
+.mediaCaption {
+  font-size: var(--dsl-g-font-data);
+  color: var(--dsw-alias-label-tertiary);
+  line-height: 1.5;
+  text-align: center;
+}
 .mediaPlayer { display: block; width: 100%; min-width: 0; border-radius: var(--dsl-g-radius-control); }
 /* Reserve the box before the bytes arrive: without an intrinsic ratio an
    unloaded <img> collapses to 0px and the card looks broken. */
@@ -724,9 +753,11 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
 .accBody,
 .banner,
 .cardTitle,
-.mediaLabel,
-.heroLabel,
-.heroTitle,
+	.mediaLabel,
+	.mediaCaption,
+	.heroLabel,
+	.heroTitle,
+	.cardEyebrow,
 .heroSubtitle,
 .statLabel,
 .ringLabel,

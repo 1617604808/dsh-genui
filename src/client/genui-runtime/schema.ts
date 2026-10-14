@@ -59,7 +59,8 @@ export interface ComponentSchema {
 
 
 /** Canonical enum domains shared by schema validation and repair. */
-export const TEXT_SIZES = ['h1', 'h2', 'h3', 'body', 'muted', 'caption'] as const
+export const TEXT_SIZES = ['display', 'h1', 'h2', 'h3', 'body', 'muted', 'caption'] as const
+export const TEXT_ALIGNS = ['left', 'center', 'right'] as const
 export const BUTTON_TONES = ['primary', 'danger', 'success', 'ghost'] as const
 export const BADGE_TONES = ['success', 'warn', 'danger', 'accent'] as const
 export const INPUT_TYPES = ['text', 'email', 'password', 'color'] as const
@@ -267,7 +268,7 @@ export const COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   // badge uses `warn`), so models cross-write them onto callout — map them
   // onto the closest canonical tone instead of failing the enum (issue #186).
   callout: schema(['content'], { ...nodeFields, title: 'string', content: 'string', tone: 'string' }, { kind: 'tone', text: 'content', body: 'content', desc: 'content' }, { enums: { tone: CALLOUT_TONES }, valueAliases: { tone: { danger: 'error', warn: 'warning' } } }),
-  card: schema(['items'], { ...nodeFields, title: 'string', items: 'nodes', tone: 'string', accent: 'string' }, { label: 'title', content: 'items' }, { enums: { tone: CARD_TONES } }),
+  card: schema(['items'], { ...nodeFields, title: 'string', eyebrow: 'string', items: 'nodes', tone: 'string', accent: 'string' }, { label: 'title', content: 'items' }, { enums: { tone: CARD_TONES } }),
   chart: schema([], {
     ...nodeFields,
     kind: 'string',
@@ -309,7 +310,7 @@ export const COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   }),
   'file-tree': schema(['items'], { ...nodeFields, items: 'array' }, { nodes: 'items' }, { nested: { items: fileTreeNodeSchema } }),
   grid: schema(['items'], { ...nodeFields, cols: 'number', items: 'nodes' }),
-  image: schema(['src'], { ...nodeFields, src: 'string', alt: 'string' }, { url: 'src', link: 'src' }),
+  image: schema(['src'], { ...nodeFields, src: 'string', alt: 'string', caption: 'string' }, { url: 'src', link: 'src' }),
   input: schema([], { ...nodeFields, label: 'string', placeholder: 'string', value: 'string', inputType: 'string', action: 'string', id: 'string' }, {}, { enums: { inputType: INPUT_TYPES } }),
   json: schema(['value'], { ...nodeFields, value: 'unknown' }),
   keyvalue: schema(['pairs'], { ...nodeFields, pairs: 'array' }, { items: 'pairs', rows: 'pairs', entries: 'pairs' }, { nested: { pairs: keyValueRecordSchema } }),
@@ -345,7 +346,7 @@ export const COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   switch: schema(['label'], { ...nodeFields, label: 'string', checked: 'boolean', action: 'string' }),
   table: schema(['columns', 'rows'], { ...nodeFields, columns: 'array', rows: 'array', types: 'array', total: 'boolean', details: 'array', filter: 'string', filterColumn: 'number', sortField: 'string', export: 'boolean' }, { headers: 'columns', data: 'rows', items: 'rows' }),
   tabs: schema(['tabs'], { ...nodeFields, tabs: 'array' }, {}, { nested: { tabs: tabHolderSchema } }),
-  text: schema(['content'], { ...nodeFields, content: 'string', size: 'string', center: 'boolean' }, { text: 'content' }, { enums: { size: TEXT_SIZES } }),
+  text: schema(['content'], { ...nodeFields, content: 'string', size: 'string', center: 'boolean', align: 'string' }, { text: 'content' }, { enums: { size: TEXT_SIZES, align: TEXT_ALIGNS } }),
   textarea: schema([], { ...nodeFields, label: 'string', placeholder: 'string', rows: 'number', value: 'string', action: 'string', id: 'string' }),
   timeline: schema(['items'], { ...nodeFields, items: 'array' }, {}, { nested: { items: timelineRecordSchema } }),
   video: schema(['src'], { ...nodeFields, src: 'string', alt: 'string', poster: 'string', loop: 'boolean', muted: 'boolean', aspectRatio: 'string' }, { url: 'src', link: 'src' }, { enums: { aspectRatio: MEDIA_ASPECT_RATIOS } }),

@@ -23,12 +23,12 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 交互：`button` `input` `select` `checkbox` `radio` `switch` `textarea` `tabs` `accordion` `copy`
 
 ### 布局
-- text: `{"type":"text","size":"h1|h2|h3|body|muted|caption","content":"...","center":true?}`
+- text: `{"type":"text","size":"display|h1|h2|h3|body|muted|caption","content":"...","align":"left|center|right"?}`（`size:"display"` 比标题大一档，作引言/开篇点题句，**一条回答 ≤1**；`center:true` 是旧写法，等价 `align:"center"`，新写一律用 `align`）
 - row / col: `{"type":"row"|"col","items":[...],"wrap":true?,"spacer":true?,"gap":n?}`
 - grid: `{"type":"grid","cols":n,"items":[...]}`
 - hero: `{"type":"hero","title":"<user-language title>","subtitle":"<user-language text>","value":"99.96%","label":"<user-language metric>","delta":"+0.02%","spark":[...],"tone":"accent|success|warning|danger"}` — **封面块**：eyebrow + 超大数字（52px，带入场计数）+ 标题 + 副标题 + tone 渐变底色。**一条回答最多用一个**，放在最前面当视觉锚点
 - span: 任意节点都可加 `"span":2`（grid 子节点占几列）——bento 排版的唯一原语：一张 `span:2` 宽卡配一张窄卡，比一列方块堆下去好看得多
-- card: `{"type":"card","title":"...","items":[...]}`；`"accent":"#f59e0b"` 指定强调色（边框 + 标题 + 极淡底色）
+- card: `{"type":"card","title":"...","items":[...]}`；`"accent":"#f59e0b"` 指定强调色（边框 + 标题 + 极淡底色）；`"eyebrow":"<user-language 小引题>"` 在标题上方加一行 meta 小字（把多张卡分章时用——**连续同章的卡片不要每张都加**，一段回答 ≤3 个）
 - palette: `chart` / `echart` 都支持 `"palette":["#ff8800","#3ecf8e"]` 覆盖分类色板（默认跟随宿主主题）。**只有语义上需要指定颜色时才写**（成本=红、收益=绿），否则跟随主题更稳；`"tone":"info|success|warning|danger"` 给卡片底色（用于结论卡/风险卡）
 - divider: `{"type":"divider"}`；**带章节名** `{"type":"divider","label":"<user-language 章节名>"}`（线 + 小标签居中，作章节切换：报告从摘要切入数据、图表册开新章时用一段；卡片/列表内部、连续同主题内容之间**不要用**，一条回答 ≤3 个）; spacer: `{"type":"spacer"}`
 
@@ -37,7 +37,7 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 - badge: `{"type":"badge","label":"...","tone":"success|warn|danger|accent","icon":"emoji?"}`
 - progress: `{"type":"progress","label":"...","value":0-100,"valueLabel":"70%"}`；`"variant":"ring"` 画环形进度，`"target":70` 在轨道上标出目标刻度
 - avatar: `{"type":"avatar","name":"...","color":"#hex?"}`
-- image: `{"type":"image","src":"/mmx-files/result.png","alt":"<user-language description>"}` — 展示浏览器可访问的 http(s) 或同源相对图片地址；懒加载；不支持 `file:`/`data:` 等本地或主动协议
+- image: `{"type":"image","src":"/mmx-files/result.png","alt":"<user-language description>"}` — 展示浏览器可访问的 http(s) 或同源相对图片地址；懒加载；不支持 `file:`/`data:` 等本地或主动协议；`"caption":"<user-language 图注>"` 在图**下方**加说明行（来源/解读/署名；`alt` 是图**上方**的标签行，两者分工不同）
 - audio: `{"type":"audio","src":"/mmx-files/result.mp3","alt":"<user-language description>","loop":true?}` — 原生控制条；用户主动播放，不自动播放；仅 http(s) 或同源相对地址
 - video: `{"type":"video","src":"/mmx-files/result.mp4","alt":"<user-language description>","poster":"/mmx-files/poster.jpg"?,"loop":true?,"muted":true?,"aspectRatio":"16:9|4:3|1:1|9:16"?}` — 原生播放/音量/全屏控制；不自动播放
 - list: `{"type":"list","items":["..."] 或 [{"title":"...","desc":"..."}] 或嵌套节点(如 {"type":"badge","label":"TS"})}` — 行内可嵌节点（计入节点预算）；记录中的 `label`/`name` 归一化为 `title`，`description`/`content`/`text`/`body`/`detail` 归一化为 `desc`；只有正文时将正文用作标题，未知字段会收到警告
@@ -235,7 +235,7 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 
 ## 编排范式：高频场景的默认起点
 
-范式是**验证过的起点，不是模板**：判断永远优先（上一节的「不要照抄」同样适用于范式），但真实会话审计显示这两类场景模型反复在排（`callout+table` 是最高频组合、`table` 是第三大组件）——与其每次重想，不如从成套结构出发、按需增删。范式之外的场景自由组合。
+范式是**验证过的起点，不是模板**：判断永远优先（上一节的「不要照抄」同样适用于范式）。六个范式各管一类高频场景——**数据问答**用「主表明细」、**分析收尾**用「结论卡」、**报告开篇**用「封面页」、**方案权衡**用「对比页」、**过程复盘**用「时间线叙事」、**教学自测**用「测验页」。从成套结构出发、按需增删；范式之外的场景自由组合。
 
 ### 主表明细（数据问答的默认结构）
 
@@ -256,6 +256,46 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 ```
 
 何时不用：结论还不成立时不要硬造结论卡（先摆数据，让读者自己看）；没有真实可执行的下一步就不要放按钮；`tone` 只有在确实传递语义（好/坏/险）时才用。
+
+### 封面页（报告开篇的默认结构）
+
+适用：正式报告/复盘/评审材料的**第一屏**——一个大数字定调，一句引言点题，三张摘要卡预告正文。
+
+```json dsh-ui
+{"items":[{"type":"hero","label":"<user-language metric>","value":"99.96%","delta":"+0.02%","tone":"accent","title":"<user-language title>","subtitle":"<user-language text>"},{"type":"text","size":"display","content":"<user-language statement>"},{"type":"divider","label":"<user-language chapter>"},{"type":"grid","cols":3,"items":[{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"stat","label":"<user-language metric>","value":"<user-language value>"}]}]}]}
+```
+
+何时不用：短回答不需要封面（hero 已是唯一焦点，再加 `display` 就是两个焦点）；hero 与 `display` 同屏时，后面不要再出现 h1 级大标题；普通问答直接给答案，不要套封面。
+
+### 对比页（方案权衡的默认结构）
+
+适用：两个（至多三个）方案/版本/选型的正面对决——定性取舍进卡，定量差异进表。
+
+```json dsh-ui
+{"items":[{"type":"grid","cols":2,"items":[{"type":"card","tone":"success","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]},{"type":"card","tone":"warning","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]}]},{"type":"table","columns":["<user-language column>","<user-language column>","<user-language column>"],"types":["text","num","num"],"rows":[["<user-language text>","8","12"],["<user-language text>","5","9"]]}]}
+```
+
+何时不用：只有单一方案时就是普通陈述，不要硬摆两张卡假装权衡；卡与表要承载**不同粒度**（卡给取舍理由、表给数值对比），两边复制同一批数字就是重复表达。
+
+### 时间线叙事（过程复盘的默认结构）
+
+适用：有先后顺序的过程/事故/迭代叙事——时间线主叙事，收尾一张卡给汇总结论。
+
+```json dsh-ui
+{"items":[{"type":"timeline","items":[{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"},{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"},{"title":"<user-language milestone>","desc":"<user-language description>","time":"<user-language date>"}]},{"type":"card","title":"<user-language title>","items":[{"type":"keyvalue","pairs":[{"key":"<user-language key>","value":"<user-language value>"},{"key":"<user-language key>","value":"<user-language value>"}]}]}]}
+```
+
+何时不用：两步以内的小流程用正文一句话讲清；纯日志列举不要套卡，`timeline` 单独就够。
+
+### 测验页（教学自测的默认结构）
+
+适用：教学/检查理解——两题以上的成组测验，radio 组带答案与解析，`submit` 聚合交卷本地判卷。
+
+```json dsh-ui
+{"items":[{"type":"radio","label":"<user-language question>","group":"q1","options":["<user-language option>","<user-language option>","<user-language option>"],"answer":1,"explanation":"<user-language explanation>"},{"type":"radio","label":"<user-language question>","group":"q2","options":["<user-language option>","<user-language option>"],"answer":0,"explanation":"<user-language explanation>"},{"type":"submit","label":"<user-language action>","action":"grade","groups":["q1","q2"]}]}
+```
+
+何时不用：单一知识点用单个 `radio`（自带本地判卷）或 `quiz` 组件，不需要 submit 组卷；题目多于 5 个拆成多条回答分批发。
 
 ## 使用规则
 
