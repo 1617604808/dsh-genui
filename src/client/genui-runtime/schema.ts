@@ -299,7 +299,9 @@ export const COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   // `items` is the container field name every other component uses, so models
   // reach for it here too; without the alias the whole node (and fence) drops.
   diff: schema(['diffs'], { ...nodeFields, diffs: 'array' }, { items: 'diffs', files: 'diffs' }, { nested: { diffs: diffRecordSchema } }),
-  divider: schema([], nodeFields),
+  // `title`/`text` are what models reach for on a labeled separator; adopt
+  // them as aliases so the whole node (and fence) never drops for it.
+  divider: schema([], { ...nodeFields, label: 'string' }, { title: 'label', text: 'label' }),
   echart: schema([], { ...nodeFields, title: 'string', height: 'number', preset: 'string', data: 'array', series: 'array', links: 'array', palette: 'array', option: 'object' }, {}, {
     // `links` alone is valid: the sankey/graph presets are edge-driven.
     oneOfRequired: [['option', 'data', 'series', 'links']],

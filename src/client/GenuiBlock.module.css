@@ -168,6 +168,30 @@ body[data-ds-dark-theme] .panel {
   margin: var(--dsl-g-gap-xs) 0;
 }
 
+/* Labeled divider (`divider.label`, B2): a chapter break — hairline + meta
+   label + hairline. It separates CHAPTERS, not list rows, so it breathes at
+   the section step (gap-xl); the unlabeled hairline stays quiet above. */
+.dividerLabeled {
+  display: flex;
+  align-items: center;
+  gap: var(--dsl-g-gap-md);
+  margin: var(--dsl-g-gap-xl) 0;
+}
+.dividerLabeled::before,
+.dividerLabeled::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--dsw-alias-markdown-hr, var(--dsl-g-border));
+}
+.dividerLabelText {
+  font-size: var(--dsl-g-font-meta);
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+  white-space: pre-line;
+  text-align: center;
+}
+
 .card {
   /* Elevated surface: on the dark theme layer-1 (35,35,36) sits only ~14 units
      above the page (21,21,23) and read as "a black box". layer-2 (44,44,46) is

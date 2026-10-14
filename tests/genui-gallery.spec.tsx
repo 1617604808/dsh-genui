@@ -37,6 +37,9 @@ describe('gallery spec', () => {
     expect(body).toContain('性能指标')
     expect(body).toContain('版本')
     expect(body).toContain('标题项')
+    // Labeled divider (B2): the chapter separator renders its label.
+    expect(document.querySelector('[class*="dividerLabeled"]')).not.toBeNull()
+    expect(body).toContain('章节分隔')
     // Avatars render their initial: the two avatars sit adjacent in a row.
     expect(body).toContain('AB')
     expect(screenCount('tab', 'label')).toBeLessThanOrEqual(GENUI_LIMITS.maxTabs)

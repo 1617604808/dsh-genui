@@ -410,7 +410,7 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
         ...opt('target', num(v.target, 0, 100)),
       }
     }
-    case 'divider': return { type: 'divider' }
+    case 'divider': return { type: 'divider', ...opt('label', str(v.label, 64)) }
     case 'spacer': return { type: 'spacer' }
     case 'avatar': {
       const name = str(v.name, 64)
@@ -1921,6 +1921,12 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
       break
     case 'diff':
       if (!Array.isArray(v.diffs)) errors.push(`${at}: type 'diff' requires diffs (array)`)
+      break
+    case 'divider':
+    case 'spacer':
+      // No required fields; declared-field kinds are covered by the registry
+      // check below. Missing cases here made validate_dsh_ui reject ANY fence
+      // containing them as "unknown type" (found via the divider.label test).
       break
     case 'json':
       if (!('value' in v)) errors.push(`${at}: type 'json' requires value`)

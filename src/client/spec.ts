@@ -243,6 +243,8 @@ export interface GenuiProgress {
 
 export interface GenuiDivider {
   type: 'divider'
+  /** Chapter separator: hairline + centered meta label (anthology program). */
+  label?: string
 }
 
 export interface GenuiAvatar {

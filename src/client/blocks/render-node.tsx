@@ -405,7 +405,16 @@ export function renderNode(
         </div>
       )
     }
-    case 'divider': return <hr key={key} className={css.divider} />
+    case 'divider':
+      // Labeled variant: a chapter break — hairline + meta label + hairline.
+      if (node.label !== undefined && node.label !== '') {
+        return (
+          <div key={key} className={css.dividerLabeled}>
+            <span className={css.dividerLabelText}>{renderInline(node.label)}</span>
+          </div>
+        )
+      }
+      return <hr key={key} className={css.divider} />
     case 'list': {
       const bound = boundField(answers, node.filter)?.toLowerCase()
       const all = node.items.slice(0, GENUI_LIMITS.maxListItems)
