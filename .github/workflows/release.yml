@@ -20,7 +20,7 @@ jobs:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
       PRERELEASE: ${{ github.event.release.prerelease }}
       HOST_REF: dsh-v0.2.0-rc.2
-      NEXT_HOST_REF: dsh-v0.2.1-alpha.1
+      NEXT_HOST_REF: dsh-v0.2.1-alpha.3
 
     steps:
       # actions/checkout@v4

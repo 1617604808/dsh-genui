@@ -96,7 +96,7 @@ The repository ships both renderer channels, the host plugin, and the built brow
 
 Prerequisites — all required:
 
-1. **dsh `^0.1.2-rc.1 || ^0.1.5-alpha.1 || ^0.1.6-alpha.1 || ^0.1.7-alpha.1 || >=0.2.0-rc.1 <0.3.0-0`** (DSH `0.2.1-alpha.1` is currently a prerelease; verified host roles: minimum `dsh-v0.1.2-rc.1`, current `dsh-v0.2.0-rc.2`, next `dsh-v0.2.1-alpha.1`; users on DSH `<=0.1.1-rc.x` should use dsh-genui `0.9.8`)
+1. **dsh `^0.1.2-rc.1 || ^0.1.5-alpha.1 || ^0.1.6-alpha.1 || ^0.1.7-alpha.1 || >=0.2.0-rc.1 <0.3.0-0`** (DSH `0.2.1-alpha.3` is currently a prerelease; verified host roles: minimum `dsh-v0.1.2-rc.1`, current `dsh-v0.2.0-rc.2`, next `dsh-v0.2.1-alpha.3`; users on DSH `<=0.1.1-rc.x` should use dsh-genui `0.9.8`)
 2. **`pnpm` on your PATH**: the `dsh plugin` command depends on it. If missing: `corepack enable` (or `npm i -g pnpm`), then **open a new terminal** and confirm `pnpm -v` prints a version
 
 Install and activate in DSH (one command, all dependencies included):
@@ -254,9 +254,9 @@ pnpm run check   # type check + full tests + build
 
 With the locked dependencies installed, the check script (`pnpm run check` or `npm run check`) uses the pinned DSH `0.1.2-rc.1` release packages.
 
-The verified host roles are minimum `dsh-v0.1.2-rc.1`, current `dsh-v0.2.0-rc.2`, and next `dsh-v0.2.1-alpha.1`. DSH `0.2.1-alpha.1` is currently a prerelease. CI keeps four primary lanes: Node 22 + current, and Node 24 + minimum/current/next. Replace these pinned tags as DSH publishes newer versions.
+The verified host roles are minimum `dsh-v0.1.2-rc.1`, current `dsh-v0.2.0-rc.2`, and next `dsh-v0.2.1-alpha.3`. DSH `0.2.1-alpha.3` is currently a prerelease. CI keeps four primary lanes: Node 22 + current, and Node 24 + minimum/current/next. Replace these pinned tags as DSH publishes newer versions.
 
-`pnpm run check:host-api dsh-v0.2.0-rc.2` and `pnpm run check:host-api dsh-v0.2.1-alpha.1` install the corresponding published DSH packages (plus the host-app runtime closure those packages import without declaring) and run TypeScript typecheck, the **full unit test suite**, and tsdown build — every non-gated suite executes against the real new host packages. Note: the `skipIf(!hasFenceRegistry)`-gated suites stay skipped under every published host — `registerFenceRenderer` has never shipped in any published `dsh-client-ui-primitives` (the gated tests cover a host contract that only existed internally; see CHANGELOG). Each CI host lane then installs the generated tarball in its pinned DSH host and runs the packed smoke.
+`pnpm run check:host-api dsh-v0.2.0-rc.2` and `pnpm run check:host-api dsh-v0.2.1-alpha.3` install the corresponding published DSH packages (plus the host-app runtime closure those packages import without declaring) and run TypeScript typecheck, the **full unit test suite**, and tsdown build — every non-gated suite executes against the real new host packages. Note: the `skipIf(!hasFenceRegistry)`-gated suites stay skipped under every published host — `registerFenceRenderer` has never shipped in any published `dsh-client-ui-primitives` (the gated tests cover a host contract that only existed internally; see CHANGELOG). Each CI host lane then installs the generated tarball in its pinned DSH host and runs the packed smoke.
 
 Run `node scripts/verify-pack.mjs --keep` to retain the verified tarball for inspection or e2e use. The default `node scripts/verify-pack.mjs` removes its temporary directory after verification.
 

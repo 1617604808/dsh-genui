@@ -14,6 +14,7 @@ const versionCases = [
   ['0.2.0-rc.2', true],
   ['0.2.0', true],
   ['0.2.1-alpha.1', true],
+  ['0.2.1-alpha.3', true],
   ['0.2.1', true],
   ['0.3.0-rc.1', false],
   ['0.3.0', false],
