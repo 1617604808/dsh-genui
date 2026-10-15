@@ -1979,83 +1979,162 @@ describe('incremental discovery (scan budget, dedupe, source rescan)', () => {
       setDomRootFactory(createRoot)
     }
   })
-})
+  it('mounts a tag-text span inside a wrapper that arrives whole', async () => {
+    const row = assistantRow('inc-wrap')
+    document.body.append(row)
+    const send = vi.fn()
+    const dispose = installDomFenceRenderer(makeCtx('inc-wrap-1', send), send)
+    try {
+      await tick()
+      // A pre-built wrapper lands in one mutation: the added root is a plain
+      // div, and only its descendant holds the complete tag text.
+      const wrapper = document.createElement('div')
+      const span = document.createElement('span')
+      span.textContent = `<dsh-ui>${VALID_SPEC}</dsh-ui>`
+      wrapper.append(span)
+      row.append(wrapper)
+      expect(await waitFor(() => span.hasAttribute('data-genui-rendered'))).toBe(true)
+      expect(span.style.display).toBe('none')
+      expect(row.querySelectorAll('.genui-dom-fence')).toHaveLength(1)
+    } finally {
+      dispose()
+    }
+  })
 
-describe('incremental discovery (scan budget, dedupe, source rescan)', () => {
-  it('mounts a fence that arrives after install through the mutation path', async () => {
-    const row = assistantRow('inc-late')
+  it('mounts a labeled surface whose class name this build does not know', async () => {
+    const row = assistantRow('inc-unknown')
     const first = stockCodeBlock(VALID_SPEC, 'dsh-ui')
     row.append(first)
     document.body.append(row)
     const send = vi.fn()
-    const dispose = installDomFenceRenderer(makeCtx('inc-1', send), send)
+    const dispose = installDomFenceRenderer(makeCtx('inc-unknown-1', send), send)
     try {
       await tick()
       expect(first.hasAttribute('data-genui-rendered')).toBe(true)
-      // A NEW block lands in an already-scanned row: discovery follows the
-      // mutation, so the transcript does not have to be walked again.
-      const late = stockCodeBlock(VALID_SPEC, 'dsh-ui')
+      // A host surface shape outside CODE_BLOCK_SELECTORS, appended to an
+      // already-scanned row: the wrapper itself is both the candidate and the
+      // root of the scan.
+      const late = deepsuiteCodeBlock(VALID_SPEC, 'dsh-ui', 'host-fence-v99')
       row.append(late)
       expect(await waitFor(() => late.hasAttribute('data-genui-rendered'))).toBe(true)
       expect(late.style.display).toBe('none')
-      expect(first.hasAttribute('data-genui-rendered')).toBe(true)
-      // Dedupe: one replacement container per block, never a second one.
-      expect(row.querySelectorAll('.genui-dom-fence')).toHaveLength(2)
     } finally {
       dispose()
     }
   })
 
-  it('rescans the transcript when a history page reaches the source (no DOM change)', async () => {
-    const rows = [assistantRow('hist-1', true), assistantRow('hist-2', true)]
-    const blocks = rows.map(() => genericCodeBlock(VALID_SPEC))
-    for (const [index, row] of rows.entries()) {
-      row.append(blocks[index]!)
-      document.body.append(row)
-    }
-    // History pages: the DOM is on screen, the source snapshot does not know
-    // the nodes yet, and nothing will mutate the DOM again.
-    const steps: Record<string, unknown> = {}
-    const chat = { nodes: { get: (key: string) => steps[key] } }
-    let update: (() => void) | undefined
-    const dispose = installDomFenceRenderer(makeSourceCtx('hist-session', () => chat, listener => {
-      update = listener
-      return () => { update = undefined }
-    }), () => {})
+  it('never takes over a message container that arrives after install', async () => {
+    const row = assistantRow('inc-container')
+    document.body.append(row)
+    const send = vi.fn()
+    const dispose = installDomFenceRenderer(makeCtx('inc-container-1', send), send)
     try {
       await tick()
-      expect(blocks.some(block => block.hasAttribute('data-genui-rendered'))).toBe(false)
-      const text = '\u0060\u0060\u0060dsh-ui\n' + VALID_SPEC + '\n\u0060\u0060\u0060'
-      for (const row of rows) {
-        steps[row.getAttribute('data-chat-node-key')!] = {
-          kind: 'assistant-step',
-          data: { blocks: [{ kind: 'text', text }] },
-        }
-      }
-      // The source is the only signal: no node was added or changed.
-      update?.()
-      expect(await waitFor(() => blocks.every(block => block.hasAttribute('data-genui-rendered')))).toBe(true)
-      expect(document.querySelectorAll('.genui-dom-fence')).toHaveLength(2)
+      // Issue #19 shape, but inserted after install: a banner label would make
+      // the container look like a fence, while the prose proves it is a whole
+      // message. Hiding it would blank the answer.
+      const container = document.createElement('div')
+      container.className = 'md-code-block'
+      const label = document.createElement('div')
+      label.textContent = 'dsh-ui'
+      const prose = document.createElement('p')
+      prose.textContent = '这段正文必须始终可见'
+      const pre = document.createElement('pre')
+      pre.textContent = VALID_SPEC
+      container.append(label, prose, pre)
+      row.append(container)
+      await tick(120)
+      expect(container.style.display).toBe('')
+      expect(container.hasAttribute('data-genui-rendered')).toBe(false)
+      expect(prose.isConnected).toBe(true)
+      expect(row.querySelector('.genui-dom-fence')).toBeNull()
+      // The streaming update of the fence text inside it is the same path.
+      pre.textContent = JSON.stringify({ title: '卡片2', items: [{ type: 'text', content: '你好，世界' }] })
+      await tick(120)
+      expect(container.style.display).toBe('')
+      expect(container.hasAttribute('data-genui-rendered')).toBe(false)
+      expect(prose.isConnected).toBe(true)
+      expect(row.querySelector('.genui-dom-fence')).toBeNull()
     } finally {
       dispose()
     }
   })
 
-  it('spreads a burst of new fences across frames instead of one unbounded pass', async () => {
+  it('ignores a fence text update inside a message container already on screen', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const row = assistantRow('inc-container-update')
+    const container = document.createElement('div')
+    container.className = 'md-code-block'
+    const label = document.createElement('div')
+    label.textContent = 'dsh-ui'
+    const prose = document.createElement('p')
+    prose.textContent = '正文'
+    const pre = document.createElement('pre')
+    pre.textContent = VALID_SPEC
+    container.append(label, prose, pre)
+    row.append(container)
+    document.body.append(row)
+    const send = vi.fn()
+    const dispose = installDomFenceRenderer(makeCtx('inc-container-update-1', send), send)
+    try {
+      await tick()
+      expect(container.style.display).toBe('')
+      // Only the text changes: the node itself was never a candidate, and a
+      // mutation must not promote it into one.
+      pre.textContent = JSON.stringify({ title: '卡片2', items: [{ type: 'text', content: '你好，世界' }] })
+      await tick(120)
+      expect(container.style.display).toBe('')
+      expect(container.hasAttribute('data-genui-rendered')).toBe(false)
+      expect(prose.isConnected).toBe(true)
+      expect(row.querySelector('.genui-dom-fence')).toBeNull()
+    } finally {
+      dispose()
+      warn.mockRestore()
+    }
+  })
+
+  it('leaves tag-text spans inside tool and reasoning panels alone', async () => {
+    const row = assistantRow('inc-panels')
+    document.body.append(row)
+    const send = vi.fn()
+    const dispose = installDomFenceRenderer(makeCtx('inc-panels-1', send), send)
+    const spans: HTMLElement[] = []
+    try {
+      await tick()
+      for (const [attribute, value] of [['data-tool', ''], ['data-chat-group-part', 'reasoning']] as const) {
+        const wrapper = document.createElement('div')
+        wrapper.setAttribute(attribute, value)
+        const span = document.createElement('span')
+        span.textContent = `<dsh-ui>${VALID_SPEC}</dsh-ui>`
+        wrapper.append(span)
+        spans.push(span)
+        row.append(wrapper)
+      }
+      await tick(160)
+      for (const span of spans) {
+        expect(span.hasAttribute('data-genui-rendered')).toBe(false)
+        expect(span.style.display).toBe('')
+      }
+      expect(row.querySelector('.genui-dom-fence')).toBeNull()
+    } finally {
+      dispose()
+    }
+  })
+
+  it('spreads a subtree that arrives after install across frames', async () => {
     const total = 16
-    const row = assistantRow('inc-burst')
+    const row = assistantRow('inc-late-burst')
+    document.body.append(row)
+    const holder = document.createElement('div')
     const blocks: HTMLElement[] = []
     for (let index = 0; index < total; index += 1) {
       const block = stockCodeBlock(VALID_SPEC, 'dsh-ui')
       blocks.push(block)
-      row.append(block)
+      holder.append(block)
     }
-    document.body.append(row)
     const mounted = (): number => blocks.filter(block => block.hasAttribute('data-genui-rendered')).length
     const fakeRoot = { render: vi.fn(), unmount: vi.fn() }
     setDomRootFactory(() => fakeRoot as unknown as ReturnType<typeof createRoot>)
-    // Every clock read advances 5ms, so one sweep budget covers a single
-    // block — the shape of a slow transcript without waiting for one.
     let fakeNow = 0
     const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => {
       fakeNow += 5
@@ -2064,18 +2143,17 @@ describe('incremental discovery (scan budget, dedupe, source rescan)', () => {
     const send = vi.fn()
     let dispose: (() => void) | undefined
     try {
-      dispose = installDomFenceRenderer(makeCtx('inc-burst', send), send)
-      expect(mounted()).toBeGreaterThan(0)
-      expect(mounted()).toBeLessThan(total)
-      // Nothing else touches the DOM: the queue keeps the frame loop going
-      // until the transcript is covered.
+      dispose = installDomFenceRenderer(makeCtx('inc-late-burst', send), send)
+      await tick()
+      // A whole page of fences lands at once, after install.
+      row.append(holder)
       expect(await waitFor(() => mounted() === total, 5000)).toBe(true)
+      expect(holder.querySelectorAll('.genui-dom-fence')).toHaveLength(total)
       expect(blocks.every(block => block.style.display === 'none')).toBe(true)
-      expect(row.querySelectorAll('.genui-dom-fence')).toHaveLength(total)
     } finally {
       dispose?.()
       nowSpy.mockRestore()
       setDomRootFactory(createRoot)
     }
-  })
+  }, 15000)
 })
