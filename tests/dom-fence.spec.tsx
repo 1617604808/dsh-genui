@@ -1883,6 +1883,89 @@ describe('final-answer blank-out hardening (issue #19)', () => {
 })
 
 describe('incremental discovery (scan budget, dedupe, source rescan)', () => {
+  it('rechecks a waiting source candidate before hiding a changed message container', async () => {
+    const row = assistantRow('source-retry-changed', true)
+    const block = genericCodeBlock(VALID_SPEC)
+    row.append(block)
+    document.body.append(row)
+    const chat = { nodes: { get: () => undefined } }
+    let update: (() => void) | undefined
+    const dispose = installDomFenceRenderer(makeSourceCtx('source-retry-session', () => chat, listener => {
+      update = listener
+      return () => { update = undefined }
+    }), () => {})
+    try {
+      await tick()
+      expect(block.hasAttribute('data-genui-rendered')).toBe(false)
+      const prose = document.createElement('p')
+      prose.textContent = 'Keep the rest of this answer visible'
+      block.append(prose)
+      row.removeAttribute('data-streaming')
+      await tick()
+      expect(block.hasAttribute('data-genui-rendered')).toBe(false)
+      // Only the source notification requeues the earlier candidate. Missing
+      // source data must not let the settled generic fallback hide the prose.
+      expect(update).toBeTypeOf('function')
+      update!()
+      await tick(120)
+      expect(block.style.display).toBe('')
+      expect(block.hasAttribute('data-genui-rendered')).toBe(false)
+      expect(prose.isConnected).toBe(true)
+      expect(row.querySelector('.genui-dom-fence')).toBeNull()
+      // Rejection must not poison future valid discovery.
+      prose.remove()
+      block.querySelector('code')!.firstChild!.textContent = VALID_SPEC + ' '
+      expect(await waitFor(() => block.hasAttribute('data-genui-rendered'))).toBe(true)
+    } finally { dispose() }
+  })
+
+  it.each(['surface', 'tag-text'] as const)('rechecks a queued %s after yielding to another frame', async kind => {
+    const row = assistantRow(`queued-${kind}`, true)
+    const pending = kind === 'surface'
+      ? stockCodeBlock(VALID_SPEC, 'dsh-ui')
+      : document.createElement('span')
+    if (kind === 'tag-text') pending.textContent = `<dsh-ui>${VALID_SPEC}</dsh-ui>`
+    // Startup discovery prioritizes the tail, leaving the first candidate
+    // queued after the first takeover uses the cooperative frame budget.
+    const first = kind === 'surface'
+      ? stockCodeBlock(VALID_SPEC, 'dsh-ui')
+      : document.createElement('span')
+    if (kind === 'tag-text') first.textContent = `<dsh-ui>${VALID_SPEC}</dsh-ui>`
+    row.append(pending, first)
+    document.body.append(row)
+    const fakeRoot = { render: vi.fn(), unmount: vi.fn() }
+    setDomRootFactory(() => fakeRoot as unknown as ReturnType<typeof createRoot>)
+    let fakeNow = 0
+    const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => (fakeNow += 5))
+    let dispose: (() => void) | undefined
+    try {
+      dispose = installDomFenceRenderer(makeModernCtx('queued-session'), () => {})
+      expect(first.hasAttribute('data-genui-rendered')).toBe(true)
+      expect(pending.hasAttribute('data-genui-rendered')).toBe(false)
+      if (kind === 'surface') {
+        const prose = document.createElement('p')
+        prose.textContent = 'Keep this prose visible'
+        pending.append(prose)
+      } else {
+        const reasoning = document.createElement('div')
+        reasoning.setAttribute('data-chat-group-part', 'reasoning')
+        row.append(reasoning)
+        reasoning.append(pending)
+      }
+      await tick(160)
+      expect(pending.style.display).toBe('')
+      expect(pending.hasAttribute('data-genui-rendered')).toBe(false)
+      expect(row.querySelectorAll('.genui-dom-fence')).toHaveLength(1)
+      // A valid fence renders while the assistant is still streaming.
+      expect(row.hasAttribute('data-streaming')).toBe(true)
+      expect(first.style.display).toBe('none')
+    } finally {
+      dispose?.()
+      nowSpy.mockRestore()
+      setDomRootFactory(createRoot)
+    }
+  })
+
   it('mounts a fence that arrives after install through the mutation path', async () => {
     const row = assistantRow('inc-late')
     const first = stockCodeBlock(VALID_SPEC, 'dsh-ui')

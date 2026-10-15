@@ -123,10 +123,10 @@ const TAG_TEXT_EXCLUDES = `.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat
 /** Slow sweep interval: the observer catches everything, this is the 1s
  * belt-and-braces pass (history loads, missed attribute batches). */
 const SWEEP_MS = 1000
-/** Per-sweep budget (ms) for turning changed nodes into fence candidates and
- * taking the discovered blocks over. A session switch or a history load can
- * queue a whole transcript at once; the remainder waits for the next sweep
- * instead of blocking this frame. */
+/** Cooperative per-sweep budget (ms) for discovery and takeover. Work yields
+ * between targets and candidates, not inside a subtree scan or block render;
+ * a once-deferred scan also runs to completion to avoid starvation. This is
+ * not a hard frame-time cap. Remaining candidates wait for the next sweep. */
 const SWEEP_BUDGET_MS = 8
 /** Rows re-checked by {@link rotationSweep}, and how many slow ticks apart
  * those passes run. The observer sees structure, text, and `data-streaming`,
@@ -1155,6 +1155,17 @@ export function installDomFenceRenderer(
       // to it (a streaming body growing a token at a time).
       queuedCandidates.delete(block)
       if (!block.isConnected) continue
+      // Discovery is not a lease: source retries and frame yields let the
+      // host move a candidate or turn its surface into a message container.
+      // Reapply the same local gates immediately before first takeover. The
+      // mounted-block maintenance path is unchanged, including streaming.
+      const eligible = tagTextBodyOf(block) !== null
+        ? isTakeoverTagText(block)
+        : surfaceRejection(block) === null
+      if (!eligible) {
+        awaitingSource.delete(block)
+        continue
+      }
       renderBlock(block)
       noteSourceDecision(block)
     }
