@@ -22,7 +22,7 @@ jobs:
             host-ref: "dsh-v0.2.0-rc.2"
             role: current
           - node: 24
-            host-ref: "dsh-v0.2.1-alpha.1"
+            host-ref: "dsh-v0.2.1-alpha.3"
             role: next
     runs-on: ubuntu-latest
     timeout-minutes: 40
