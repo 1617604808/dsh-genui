@@ -211,13 +211,19 @@ window.run = async (mode) => {
     document.body.setAttribute('data-theme', 'dark')
     const visibleDiagram = () =>
       mount.lastElementChild.querySelector('[data-genui-mermaid]')
-    const hasColor = (svg, color) =>
-      svg &&
-      [...svg.querySelectorAll('foreignObject *,text')].some(
-        (label) =>
-          getComputedStyle(label).color === color ||
-          getComputedStyle(label).fill === color,
-      )
+    const hasColor = (svg, color) => {
+      if (!svg) return false
+      const colors = [...svg.querySelectorAll('text')]
+        .filter(label => label.textContent.trim())
+        .map(label => getComputedStyle(label).fill)
+      for (const label of svg.querySelectorAll('foreignObject')) {
+        const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT)
+        for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+          if (text.textContent.trim()) colors.push(getComputedStyle(text.parentElement).color)
+        }
+      }
+      return colors.length > 0 && colors.every(actual => actual === color)
+    }
     await wait(
       () =>
         calls.length > before &&
