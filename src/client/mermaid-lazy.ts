@@ -43,15 +43,22 @@ const onScroll = (): void => {
 }
 const onVisibility = (): void => { pump() }
 
+/** 持续监听滚动与页面可见状态，供空闲调度器记录活动时间。 */
+function listenForActivity(): void {
+  if (listening || typeof document === 'undefined') return
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+  document.addEventListener('visibilitychange', onVisibility)
+  listening = true
+}
+
+// 调度器随客户端渲染器加载，确保队列空闲时也能记录滚动事件。
+listenForActivity()
+
 function pump(): void {
   if (active) return
   if (jobs.length === 0) {
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
-    document.removeEventListener('scroll', onScroll, true)
-    document.removeEventListener('visibilitychange', onVisibility)
-    listening = false
-    scrollUntil = 0
     return
   }
   if (timer !== undefined || document.hidden) return
@@ -60,6 +67,7 @@ function pump(): void {
   timer = setTimeout(() => {
     timer = undefined
     if (document.hidden) return
+    if (performance.now() < scrollUntil) { pump(); return }
     const job = jobs.shift()
     if (job === undefined) { pump(); return }
     active = true
@@ -111,11 +119,7 @@ export function renderMermaid(code: string, options: { signal?: AbortSignal } = 
     } }
     signal?.addEventListener('abort', job.abort, { once: true })
     jobs.push(job)
-    if (!listening) {
-      document.addEventListener('scroll', onScroll, { capture: true, passive: true })
-      document.addEventListener('visibilitychange', onVisibility)
-      listening = true
-    }
+    listenForActivity()
     pump()
   })
 }

@@ -9,6 +9,7 @@ import { CodeBlock, DiffBlock, JsonTree, writeClipboard } from '../primitive-ada
 import { renderInline } from '../inline.ts'
 import css from '../GenuiBlock.module.css'
 import { GENUI_LIMITS } from '../genui-runtime/index.ts'
+import { renderMermaid } from '../mermaid-lazy.ts'
 import { PlotBlock } from '../PlotBlock.tsx'
 import { renderNode } from './render-node.tsx'
 import { codeBlockLabels, diffBlockLabels, jsonTreeLabels } from '../primitive-labels.ts'
@@ -299,9 +300,7 @@ export const MermaidNode = memo(function MermaidNode({ node }: { node: GenuiMerm
       controller = current
       void (async () => {
         try {
-          const m = await import('../mermaid-lazy.ts')
-          if (current.signal.aborted) return
-          const svg = await m.renderMermaid(code, { signal: current.signal })
+          const svg = await renderMermaid(code, { signal: current.signal })
           if (alive && !current.signal.aborted) {
             finished = true
             setState({ status: 'ready', html: svg })
@@ -366,9 +365,18 @@ export const MermaidNode = memo(function MermaidNode({ node }: { node: GenuiMerm
       scheme?.removeEventListener('change', onTheme)
     }
   }, [code])
-  if (state.status === 'error') return <div ref={ref} className={css.mermaidFallback}><pre>{code}</pre><div className={css.mermaidErr}>{t('block.mermaidError')}</div></div>
-  if (state.status === 'loading') return <div ref={ref} className={css.mermaidFallback}><pre>{code}</pre><div className={css.mermaidHint}>{t('block.mermaidLoading')}</div></div>
-  return <div ref={ref} className={css.mermaid} dangerouslySetInnerHTML={{ __html: state.html }} data-genui-mermaid />
+  return (
+    <div
+      ref={ref}
+      className={state.status === 'ready' ? css.mermaid : css.mermaidFallback}
+      data-genui-mermaid={state.status === 'ready' ? '' : undefined}
+      dangerouslySetInnerHTML={state.status === 'ready' ? { __html: state.html } : undefined}
+    >
+      {state.status === 'ready' ? null : state.status === 'error'
+        ? <><pre>{code}</pre><div className={css.mermaidErr}>{t('block.mermaidError')}</div></>
+        : <><pre>{code}</pre><div className={css.mermaidHint}>{t('block.mermaidLoading')}</div></>}
+    </div>
+  )
 })
 
 /** Scene3D: three.js WebGL canvas, lazily imported. */

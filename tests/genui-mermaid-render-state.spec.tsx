@@ -102,13 +102,35 @@ describe('Mermaid render state', () => {
     expect(renderMermaidMock).toHaveBeenCalledTimes(2)
   })
 
+  it('keeps observing the same root after rendering and refreshes theme after reentry', async () => {
+    const intersect = viewport()
+    renderMermaidMock
+      .mockResolvedValueOnce('<svg><text>light</text></svg>')
+      .mockResolvedValueOnce('<svg><text>dark</text></svg>')
+    const view = render(<MermaidNode node={node('graph TD\nA --> B')} />)
+    const observedRoot = view.container.firstElementChild
+
+    intersect(true)
+    await waitFor(() => expect(view.container.innerHTML).toContain('light'))
+    expect(view.container.firstElementChild).toBe(observedRoot)
+
+    intersect(false)
+    await act(async () => { document.body.style.setProperty('--dsw-alias-label-primary', '#ffffff') })
+    expect(renderMermaidMock).toHaveBeenCalledTimes(1)
+
+    intersect(true)
+    await waitFor(() => expect(view.container.innerHTML).toContain('dark'))
+    expect(view.container.firstElementChild).toBe(observedRoot)
+    expect(renderMermaidMock).toHaveBeenCalledTimes(2)
+  })
+
   it('discards unmounted and superseded source before starting engine work', async () => {
     const intersect = viewport()
     renderMermaidMock.mockResolvedValue('<svg/>')
     const view = render(<MermaidNode node={node('old')} />)
     view.rerender(<MermaidNode node={node('new')} />)
-    intersect(true, 1)
     view.unmount()
+    intersect(true, 1)
     await act(async () => {})
     expect(renderMermaidMock).not.toHaveBeenCalled()
   })
@@ -165,6 +187,8 @@ function engine(render: (code: string) => Promise<string>): void {
 describe('Mermaid render scheduling', () => {
   it('runs one engine call at a time and yields a task between diagrams', async () => {
     vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
     const events: string[] = []
     let finish!: (svg: string) => void
     engine(async code => {
@@ -187,6 +211,8 @@ describe('Mermaid render scheduling', () => {
 
   it('cancels queued work without invoking the engine and continues after an error', async () => {
     vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
     const draw = vi.fn(async code => {
       if (code === 'invalid') throw new Error('parse failed')
       return '<svg/>'
@@ -206,6 +232,8 @@ describe('Mermaid render scheduling', () => {
 
   it('waits for a quiet scroll period, including nested scroll containers', async () => {
     vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
     // Fake timers also control performance.now(), used by the quiet period.
     const draw = vi.fn(async () => '<svg/>')
     engine(draw)
@@ -224,8 +252,37 @@ describe('Mermaid render scheduling', () => {
     scroll.remove()
   })
 
+  it('waits for a scroll that happened while the queue was idle', async () => {
+    vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
+    const draw = vi.fn(async () => '<svg/>')
+    engine(draw)
+
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(100)
+    const first = scheduled.renderMermaid('after-idle-scroll')
+    await vi.advanceTimersByTimeAsync(149)
+    expect(draw).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(first).resolves.toBe('<svg/>')
+    expect(draw).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(250)
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(100)
+    const second = scheduled.renderMermaid('after-queue-drained-scroll')
+    await vi.advanceTimersByTimeAsync(149)
+    expect(draw).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(second).resolves.toBe('<svg/>')
+    expect(draw).toHaveBeenCalledTimes(2)
+  })
+
   it('suspends hidden documents and resumes on visibilitychange', async () => {
     vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
     let hidden = true
     vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden)
     const draw = vi.fn(async () => '<svg/>')
@@ -241,6 +298,8 @@ describe('Mermaid render scheduling', () => {
 
   it('drops the result of a running canceled job without overlapping its successor', async () => {
     vi.useFakeTimers()
+    document.dispatchEvent(new Event('scroll'))
+    await vi.advanceTimersByTimeAsync(250)
     let finish!: (svg: string) => void
     const draw = vi.fn(async () => new Promise<string>(resolve => { finish = resolve }))
     engine(draw)
