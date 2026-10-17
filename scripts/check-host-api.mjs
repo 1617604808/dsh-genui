@@ -43,8 +43,7 @@ try {
     assert.equal(installed.version, version, `${name} 必须使用 ${version} 的公开类型`)
   }
   execFileSync('pnpm', ['exec', 'tsc', '-p', 'tsconfig.json'], { cwd: checkRoot, stdio: 'inherit' })
-  // 全量套件：安装的宿主暴露 fence-registry 时，registry 门控的渲染用例
-  // （默认 0.1.2-rc.1 依赖下被 skipIf 跳过的那批）会真正执行而不是静默跳过
+  // 全量套件使用已安装宿主的公开类型和运行依赖执行。
   execFileSync('pnpm', ['exec', 'vitest', 'run'], { cwd: checkRoot, stdio: 'inherit' })
   execFileSync('pnpm', ['exec', 'tsdown'], { cwd: checkRoot, stdio: 'inherit' })
   console.log(`${hostRef} API typecheck、全量单元测试与 tsdown build 通过`)

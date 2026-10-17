@@ -2,17 +2,10 @@
  * dsh-genui browser half: the ```dsh-ui fence renderer, the keyed toolview
  * for the `render_ui` tool, and the session panel dock.
  *
- * Fence rendering is dual-mode, chosen at boot:
- * - **Registry channel** (contract hosts): the host's MarkdownText resolves
- *   ```dsh-ui fences through the fence-registry extension point; this package
- *   registers `renderGenuiFence`. Action callbacks ride the host-installed
- *   GenuiActionContext.
- * - **DOM channel** (pristine hosts): no extension point exists, so
- *   `dom-fence.ts` observes the conversation DOM, finds settled stock code
- *   blocks labelled `dsh-ui`, and mounts the same render pipeline in its own
- *   React roots — wrapped in the plugin-owned GenuiActionContext that relays
- *   `[genui-action]` through the scoped conversation send. Either way the
- *   deployment is the STOCK DSH snapshot plus this plugin.
+ * Fence rendering uses the stock DSH DOM. `dom-fence.ts` observes the
+ * conversation DOM, identifies `dsh-ui` blocks and mounts the renderer in
+ * plugin-owned React roots. The plugin-owned GenuiActionContext relays
+ * `[genui-action]` through the scoped conversation send.
  *
  * The renderer parses the fence body with the partial parser: while the reply
  * streams, every FINISHED component appears the moment its JSON object
@@ -26,13 +19,10 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { IConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { createElement, type Key, type ReactNode } from 'react'
+import { createElement } from 'react'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import { installDomFenceRenderer } from './dom-fence.tsx'
 import { createFileLinkAvailability, withFileLinkContext, type FileLinkCordisContext } from './file-link-context.tsx'
-import { renderGenuiFence, type GenuiFenceContext } from './fence-render.tsx'
-import { renderSvgFence } from './svg-fence.tsx'
 import { createPanelSlashSource } from './panel-command.ts'
 import { GenuiPanel, type GenuiPanelInjected } from './panel.tsx'
 import { GenuiToolView } from './toolview.tsx'
@@ -40,11 +30,6 @@ import { mountAchievementToasts } from './achievement-toast.tsx'
 import { bridgeHostLocale } from './i18n/index.ts'
 import type { InputTriggerServiceContract } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { assetUrl } from './asset-loader.ts'
-
-/** Host extension surface the registry channel needs (absent on pristine). */
-type HostFenceExt = {
-  registerFenceRenderer?: (lang: string, renderer: (raw: string, key: Key, context?: GenuiFenceContext) => ReactNode) => () => void
-}
 
 /** Add low-priority prefetch links for the lazy engine assets (mermaid/three).
  * Browser-dependent: some engines ignore `<link rel=prefetch>`; harmless
@@ -112,8 +97,7 @@ function sendPanelInstruction(ctx: Context, sessionId: SessionId, instruction: s
 
 /**
  * Inline-fence action relay (DOM channel): the same message template the
- * contract host's sendGenuiAction uses, so the model sees one identical
- * [genui-action] contract on both channels.
+ * host action message template, so inline actions reach the model consistently.
  */
 function sendInlineGenuiAction(ctx: Context, sessionId: SessionId, action: string, payload: Record<string, unknown>): void {
   const scoped = ctx.sessions.scope(sessionId)
@@ -128,43 +112,22 @@ function sendInlineGenuiAction(ctx: Context, sessionId: SessionId, action: strin
   })
 }
 
-/** Visual-regression flag: `scripts/e2e-visual.mts` sets
- * `window.__DSH_GENUI_E2E__ = true` via an init script BEFORE this bundle
- * boots, which pins the DOM channel even on hosts that ship the registry
- * extension point. The DOM channel is what lets the harness inject a gallery
- * fence into an empty scratch profile and screenshot the real React tree
- * without a model round trip; production pages never set the flag. */
-function forcedDomChannel(): boolean {
-  return (globalThis as { __DSH_GENUI_E2E__?: boolean }).__DSH_GENUI_E2E__ === true
-}
-
-/** Cordis client entry: register the fence renderer on boot, the keyed
+/** Cordis client entry: install the fence renderer on boot, the keyed
  * toolview for the render_ui tool, and the session panel dock; returning the
  * disposers lets cordis tear all registrations down on plugin unload. */
 export function apply(ctx: Context): () => void {
-  // Fence channel selection: the registry extension point when the host
-  // ships it (contract line), the DOM observer otherwise (pristine line).
-  // One plugin build serves both deployments.
   // Language: follow the host's DSH language preference when the deployment
   // ships the locale service, otherwise fall back to browser detection. Read
-  // OPTIONALLY (never declared in `inject`) so a pristine host without the
+  // OPTIONALLY (never declared in `inject`) so a host without the
   // service still renders — a declared-but-absent service would park the
   // fiber forever and kill all GenUI rendering.
   const localeDispose = bridgeHostLocale(ctx)
-  const registerFn = (primitives as unknown as HostFenceExt).registerFenceRenderer
-  const useRegistry = typeof registerFn === 'function' && !forcedDomChannel()
   const fileLinkAvailability = createFileLinkAvailability(ctx as unknown as FileLinkCordisContext)
-  const channel = useRegistry ? 'registry' : 'dom'
-  console.info(`[genui] client active; fence-channel=${channel}`)
-  const disposers: Array<() => void> = useRegistry
-    ? [localeDispose, registerFn!('dsh-ui', (raw, key, context) => withFileLinkContext(
-      ctx as unknown as FileLinkCordisContext,
-      fileLinkAvailability,
-      context?.sessionId,
-      context?.source === undefined,
-      renderGenuiFence(raw, key, context),
-    )), registerFn!('svg', renderSvgFence)]
-    : [localeDispose, installDomFenceRenderer(ctx, (sessionId, action, payload) => sendInlineGenuiAction(ctx, sessionId, action, payload), fileLinkAvailability)]
+  console.info('[genui] client active; fence-channel=dom')
+  const disposers: Array<() => void> = [
+    localeDispose,
+    installDomFenceRenderer(ctx, (sessionId, action, payload) => sendInlineGenuiAction(ctx, sessionId, action, payload), fileLinkAvailability),
+  ]
   // Idle prefetch of the lazy engine assets: the browser downloads them at
   // LOW priority whenever the page is idle, so the first mermaid/3D node in
   // a session usually hits a warm cache instead of paying the fetch on first
@@ -239,8 +202,3 @@ export function apply(ctx: Context): () => void {
 // arrival order, hosts without it never register /panel — and the renderer
 // itself never depends on the service either way.
 export const inject = ['slots', 'sessions']
-
-// Re-export the registry renderer for the test suite (setup.ts registers it
-// exactly like apply() does on contract hosts).
-export { renderGenuiFence }
-export type { GenuiFenceContext } from './fence-render.tsx'
