@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// DOM render channel: pure-plugin fence rendering on pristine hosts.
+// DOM render channel: plugin-owned fence rendering in DSH conversation DOM.
 // Builds the stock CodeBlock surface (`.md-code-block` + banner label div +
 // `<pre>`) inside a conversation row and drives the observer pipeline.
 import { cleanup, fireEvent } from '@testing-library/react'
@@ -18,7 +18,10 @@ const TIER2_SCHEMA_FAILURE = '{"items":[{"type":"stat","value":"好"'
 
 function makeCtx(sessionId: string | undefined, send: ReturnType<typeof vi.fn>): Context {
   return {
-    sessions: { list: { getSnapshot: () => ({ current: sessionId }) } },
+    sessions: {
+      list: { getSnapshot: () => ({ ids: sessionId === undefined ? [] : [sessionId] }) },
+      retainInfo: (id: string) => ({ getSnapshot: () => ({ retainedBy: id === sessionId ? { mainView: 1 } : {} }) }),
+    },
   } as unknown as Context
 }
 
@@ -29,13 +32,16 @@ function makeModernCtx(sessionId: string): Context {
         getSnapshot: () => ({
           ids: ['sidebar-session', sessionId],
           byId: {
-            'sidebar-session': { id: 'sidebar-session', retainedBy: { sidebar: 1 } },
-            [sessionId]: { id: sessionId, retainedBy: { mainView: 1 } },
+            'sidebar-session': { id: 'sidebar-session' },
+            [sessionId]: { id: sessionId },
           },
           phase: 'ready',
           projectionsBySession: {},
         }),
       },
+      retainInfo: (id: string) => ({
+        getSnapshot: () => ({ retainedBy: id === sessionId ? { mainView: 1 } : { sidebar: 1 } }),
+      }),
     },
   } as unknown as Context
 }
@@ -637,6 +643,7 @@ describe('installDomFenceRenderer', () => {
             return () => { sessionUpdate = undefined }
           },
         },
+        retainInfo: (id: string) => ({ getSnapshot: () => ({ retainedBy: id === sessionId ? { mainView: 1 } : {} }) }),
       },
       get: (name: string) => name === 'uiConversation' ? {
         binding: (id: string) => ({ target: () => ({

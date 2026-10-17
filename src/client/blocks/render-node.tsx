@@ -4,8 +4,7 @@
  * the sibling block modules. Depth-guarded against pathological specs.
  * @module @changfenhuang/dsh-genui/client/blocks/render-node
  */
-import { type ComponentType, type ReactNode, useEffect, useState, type CSSProperties } from 'react'
-import * as primitives from '../primitive-adapter.ts'
+import { type ReactNode, useEffect, useState, type CSSProperties } from 'react'
 import css from '../GenuiBlock.module.css'
 import { GENUI_LIMITS } from '../genui-runtime/index.ts'
 import { renderInline } from '../inline.ts'
@@ -29,25 +28,6 @@ import { ImageNode } from './image.tsx'
 import { SvgNode } from './svg.tsx'
 
 import { EChartNode } from '../EChartNode.tsx'
-
-/** Custom node data shape (declared locally: pristine hosts export no type). */
-interface GenuiCustomNode {
-  type: string
-  [key: string]: unknown
-}
-
-/** Props a registered custom renderer receives. */
-interface GenuiCustomProps {
-  node: GenuiCustomNode
-  onAction?: GenuiBlockProps['onAction']
-  renderChildren: (nodes: unknown[], keyBase: string) => unknown
-}
-
-/** Custom-component registry lookup, feature-detected (contract hosts only). */
-type HostGenuiExt = {
-  getGenuiComponent?: (type: string) => ComponentType<GenuiCustomProps> | undefined
-}
-const getGenuiComponent = (primitives as unknown as HostGenuiExt).getGenuiComponent
 
 function isListItemNode(item: GenuiList['items'][number]): item is GenuiNode {
   return typeof item === 'object' && item !== null && 'type' in item
@@ -484,25 +464,7 @@ export function renderNode(
     case 'diagram': return <DiagramNode key={key} node={node} />
 
     case 'echart': return <EChartNode key={key} node={node} />
-    default: {
-      // Plugin-registered custom types: a plugin ships a renderer through
-      // registerGenuiComponent; unregistered unknowns render nothing. The
-      // spec union is exhaustive, so an unknown node arrives as a plugin
-      // extension — treat it as a generic data node.
-      const custom = node as unknown as GenuiCustomNode
-      const Custom = getGenuiComponent?.(custom.type)
-      if (Custom !== undefined) {
-        return (
-          <Custom
-            key={key}
-            node={custom}
-            onAction={onAction}
-            renderChildren={(nodes, base) => nodes.map((c, i) => renderNode(c as GenuiNode, Number(base) + i, onAction, depth + 1, answers))}
-          />
-        )
-      }
-      return null
-    }
+    default: return null
   }
 }
 

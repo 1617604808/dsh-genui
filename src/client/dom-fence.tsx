@@ -1,5 +1,5 @@
 /**
- * DOM render channel: pure-plugin fence rendering for pristine hosts.
+ * DOM render channel: plugin-owned rendering of DSH conversation fences.
  *
  * Stock DSH renders every fenced code block through the shared CodeBlock
  * surface (stable class `md-code-block`, language label rendered as the
@@ -30,7 +30,7 @@
  *   1s sweep is the backstop.
  * - **Settled transition**: when `[data-streaming]` leaves the row, the
  *   mount re-renders with the stable source identity — the moment panels
- *   publish and durable state keys in (mirrors the registry channel's
+ *   publish and durable state keys in (mirrors inline fence rendering's
  *   settled-source semantics; streaming renders are identity-less).
  * - **Visible failure**: a settled block that stays a code block (malformed
  *   JSON, guard rejection, chart contract) mounts {@link FenceDiagnostic}
@@ -46,7 +46,7 @@
  * - Removal (branch switch, unload): each mount is unmounted with its root,
  *   and the stock block is restored.
  *
- * Security posture matches the registry channel: only code shipped in this
+ * Security posture: only code shipped in this
  * plugin's browser bundle mounts React roots, the model can only author
  * fence text, and unrepairable bodies remain visible in their host form.
  */
@@ -699,7 +699,13 @@ export function hostFenceIndexOf(row: Element, block: Element): number {
 /** Read the viewed session and report when Cordis rejects access to its Context. */
 function sourceSessionOf(ctx: Context): { available: true; sessionId: SessionId | undefined } | { available: false } {
   try {
-    return { available: true, sessionId: resolveViewedSessionId(ctx.sessions.list.getSnapshot()) }
+    return {
+      available: true,
+      sessionId: resolveViewedSessionId(
+        ctx.sessions.list.getSnapshot(),
+        sessionId => ctx.sessions.retainInfo(sessionId),
+      ),
+    }
   } catch {
     return { available: false }
   }
@@ -868,7 +874,7 @@ export function installDomFenceRenderer(
 
   /** Render context for a block: session always; the stable source identity
    * only once settled — streaming renders are identity-less (no panel
-   * publish, no durable state), mirroring the registry channel. */
+   * publish, no durable state), matching inline fence behavior. */
   function contextOf(row: Element, block: Element, settled: boolean, preserveSessionIdentity = false): { key: Key; context: GenuiFenceContext } {
     if (settled && row.getAttribute('data-chat-anchor-key') === null) {
       // Safari / fallback render path: the host omitted the row anchor (the
@@ -1002,7 +1008,7 @@ export function installDomFenceRenderer(
     const sourceLanguage = domLanguage === null ? sourceLanguages.get(block) : undefined
     const language = domLanguage ?? sourceLanguage
     const raw = rawOf(block)
-    // DSH 0.1.7-alpha.2 会在最终 DOM 隐去不支持高亮的语言；公开 ChatSnapshot 的原始 Markdown 是 language 来源。
+    // DSH 可能在最终 DOM 隐去不支持高亮的语言；公开 ChatSnapshot 的原始 Markdown 是 language 来源。
     // 内容识别只在 source 暂不可用且 assistant 已结束时兜底，不覆盖已确认的 language 或无 language fence。
     const genericGenui = language === undefined && settled && isGenericGenuiFence(block, raw)
     if (language !== 'dsh-ui' && language !== 'svg' && !genericGenui) return
