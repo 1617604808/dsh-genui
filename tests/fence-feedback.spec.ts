@@ -18,6 +18,7 @@ import {
   planFenceFeedback,
   FEEDBACK_PLUGIN_NAME,
   FEEDBACK_SOURCE_KIND,
+  MAX_CORRECTIONS_PER_TURN,
 } from '../src/plugin/fence-feedback.ts'
 
 /** A fence body that renders: one stat carrying a metric list (#172 case A). */
@@ -1185,6 +1186,33 @@ describe('reasoning-only 交付提醒进入下一次模型请求', () => {
         () => streamChunks(reasoningOnlyStream),
       ))
       expect(second.at(-1)).toMatchObject({
+        type: 'finish',
+        reason: { kind: 'error', failure: { code: 'EMPTY_RESPONSE' } },
+      })
+    } finally {
+      await h.dispose()
+    }
+  })
+
+  it('falls back to EMPTY_RESPONSE when the shared correction budget is exhausted', async () => {
+    const h = await persistedFeedbackHarness()
+    try {
+      h.startTurn()
+      h.validate()
+
+      h.assistant(BROKEN)
+      h.boundary()
+      h.assistant('{"items":[{"type":"table"}]}')
+      h.boundary()
+      expect(h.steer).toHaveBeenCalledTimes(MAX_CORRECTIONS_PER_TURN)
+
+      const chunks = await collectChunks(h.ctx.waterfall(
+        'llm/stream',
+        agentRequest({ sessionId: h.session.id }),
+        () => streamChunks(reasoningOnlyStream),
+      ))
+
+      expect(chunks.at(-1)).toMatchObject({
         type: 'finish',
         reason: { kind: 'error', failure: { code: 'EMPTY_RESPONSE' } },
       })

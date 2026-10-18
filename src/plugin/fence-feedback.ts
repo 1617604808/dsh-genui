@@ -355,6 +355,7 @@ async function* retryReasoningOnlyGenuiStream(
     const reminderAvailable = feedbackEnabled
       && state !== undefined
       && state.currentTurn !== undefined
+      && (state.correctionsTurn !== state.currentTurn || state.correctionsThisTurn < MAX_CORRECTIONS_PER_TURN)
       && !state.deliveryRemindedTurns.has(state.currentTurn)
     if (chunk.type === 'finish' && chunk.reason.kind === 'stop' && hasReasoningBlock && !hasOtherBlock && !reminderAvailable) {
       yield {

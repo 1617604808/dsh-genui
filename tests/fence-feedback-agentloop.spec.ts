@@ -78,7 +78,17 @@ describe('真实 AgentLoop：reasoning-only 之后的请求带上交付提醒', 
       content: [{ type: 'text', text: '请展示界面' }],
       source: { kind: 'user' },
     }))
-    await Promise.race([agent.whenIdle(), new Promise(resolve => setTimeout(resolve, 20000))])
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        agent.whenIdle(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('AgentLoop 未能在 20 秒内进入空闲状态')), 20000)
+        }),
+      ])
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout)
+    }
     if (adapter.requests.length === 0 && failures.length > 0) {
       throw new Error(`agent 未发出请求，driver 报错：${String((failures[0] as Error)?.message ?? failures[0])}`)
     }
