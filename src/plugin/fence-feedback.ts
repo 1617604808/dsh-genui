@@ -319,14 +319,14 @@ export function missingBodyCorrectionText(turn: number, attempt = 1, renderUiToo
 /**
  * 将 GenUI 回合中仅含 reasoning 的完整响应转换为宿主已有的可重试空响应错误。
  *
- * 改写只在「本回合的交付提醒已经发过」时进行：提醒尚未发出时放行原始 stop，
+ * 只有回合边界确实还能发送交付提醒时，才放行原始 stop，
  * 让回合正常结束并走到 `agent/turn-stopping` 边界——那里会 steer 一条交付提醒，
  * 回合因此继续到下一个 step，模型有机会在同一回合把内容补进正文。
  * 提醒发过仍然只有 reasoning，才用 EMPTY_RESPONSE 交给宿主重试兜底。
  *
  * @param options - LLM stream waterfall 拦截的请求。
  * @param source - 本次请求的 provider stream。
- * @param state - 当前回合状态；缺省时按「未提醒」处理，放行原始 stop。
+ * @param state - 当前回合状态；缺省时没有可用提醒，保留宿主重试。
  * @param feedbackEnabled - 同回合修正是否启用。关闭时没有提醒可用，保持原有改写行为。
  * @returns 原始 stream；仅在提醒已发出、或提醒不可用时改写 reasoning-only 终止。
  */
@@ -349,15 +349,30 @@ async function* retryReasoningOnlyGenuiStream(
       if (chunk.block.type === 'reasoning') hasReasoningBlock = true
       else hasOtherBlock = true
     }
-    // 还有提醒可用时放行：让 turn-stopping 的 delivery reminder 先接管本轮，
-    // 避免在模型还有机会补正文之前就把整轮输出判死。
-    // 修正被关闭时提醒永远发不出来，此时必须保持改写，否则回合会静默留空。
-    const reminderAvailable = feedbackEnabled
-      && state !== undefined
-      && state.currentTurn !== undefined
-      && (state.correctionsTurn !== state.currentTurn || state.correctionsThisTurn < MAX_CORRECTIONS_PER_TURN)
-      && !state.deliveryRemindedTurns.has(state.currentTurn)
-    if (chunk.type === 'finish' && chunk.reason.kind === 'stop' && hasReasoningBlock && !hasOtherBlock && !reminderAvailable) {
+    if (chunk.type === 'finish' && chunk.reason.kind === 'stop' && hasReasoningBlock && !hasOtherBlock) {
+      // Reuse the boundary's decision: an unused reminder is not necessarily
+      // available (for example, a previous broken fence counts as body delivery).
+      // This response has no body, so its assistant/message will clear text;
+      // do not plan against the previous step's fence before that event arrives.
+      const reminderAvailable = feedbackEnabled
+        && state !== undefined
+        && state.currentTurn !== undefined
+        && state.pendingRenders.size === 0
+        && planFenceFeedback({
+          text: '',
+          turn: state.currentTurn,
+          correctedSpec: state.correctedSpec,
+          deliveryRemindedTurns: state.deliveryRemindedTurns,
+          validatedThisTurn: state.validatedThisTurn,
+          deliveredThisTurn: state.deliveredThisTurn,
+          aborted: options.signal?.aborted ?? false,
+          correctionsThisTurn: state.correctionsThisTurn,
+          correctionsTurn: state.correctionsTurn,
+        })?.kind === 'delivery'
+      if (reminderAvailable) {
+        yield chunk
+        continue
+      }
       yield {
         type: 'finish',
         reason: {
