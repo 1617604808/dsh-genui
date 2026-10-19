@@ -311,12 +311,11 @@ function measure(phase: string) {
       const productWidth = productCell.getBoundingClientRect().width
       const rowHeight = row.getBoundingClientRect().height
       const lineHeight = parseFloat(getComputedStyle(identifierCell).lineHeight)
+      // CJK fallback fonts differ across platforms: this table may legitimately
+      // fit without scrolling. Assert the #326 regression (column collapse)
+      // here; the wide Latin inline-code fixture above independently requires
+      // horizontal scrolling, without depending on installed CJK glyphs.
       return [
-        {
-          name: `${item.name}: table can scroll horizontally`, phase,
-          scrollWidth: wrapper.scrollWidth, clientWidth: wrapper.clientWidth,
-          pass: wrapper.scrollWidth > wrapper.clientWidth,
-        },
         {
           name: `${item.name}: identifier column keeps usable width`, phase,
           identifierWidth, productWidth, pass: identifierWidth > productWidth / 4,
