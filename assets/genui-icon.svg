@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>GenUI</title>
+  <path d="M15 7H49C55.627 7 61 12.373 61 19V37C61 43.627 55.627 49 49 49H23L11.2 58.2C10.302 58.9 9 58.26 9 57.12V47.39C5.414 45.315 3 41.438 3 37V19C3 12.373 8.373 7 15 7Z" fill="#4D6BFE"/>
+  <g fill="#FFF">
+    <rect x="9" y="30" width="6" height="11" rx="1.7"/>
+    <rect x="17.5" y="24" width="6" height="17" rx="1.7"/>
+    <rect x="26" y="18" width="6" height="23" rx="1.7"/>
+    <rect x="36" y="19" width="19" height="4" rx="2"/>
+    <rect x="36" y="29" width="19" height="12" rx="3.5"/>
+  </g>
+</svg>
