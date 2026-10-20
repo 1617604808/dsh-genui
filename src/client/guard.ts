@@ -24,7 +24,7 @@ import {
   BADGE_TONES, BUTTON_TONES, CALLOUT_TONES, CARD_TONES, CHART_KINDS, COMPONENT_SCHEMAS, HERO_TONES,
   DIAGRAM_EDGE_KINDS, DIAGRAM_KINDS, DIAGRAM_NODE_TYPES, DIAGRAM_ROUTES, DIAGRAM_VARIANTS,
   ECHART_PRESETS, FILE_TYPES, GENUI_NATIVE_TYPES, GENUI_SPEC_SCHEMA, INPUT_TYPES,
-  MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES,
+  ARROW_DIRS, BLOCKS_VARIANTS, BLOCK_CELL_TONES, ICON_TONES, MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, ROW_JUSTIFY, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES, TEXT_TONES,
 } from './genui-runtime/schema.ts'
 import type { ComponentFieldKind, ComponentRecordSchema, ComponentSchema } from './genui-runtime/schema.ts'
 import { normalizeGenuiSpec } from './genui-runtime/normalize.ts'
@@ -276,14 +276,88 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
         type: 'text', content,
         ...opt('size', enu(v.size, TEXT_SIZES)),
         ...opt('align', enu(v.align, TEXT_ALIGNS)),
+        ...opt('tone', enu(v.tone, TEXT_TONES)),
+        ...opt('mono', v.mono === true ? true : undefined),
         ...opt('center', v.center === true ? true : undefined),
       }
     }
+    case 'icon': {
+      // `name` 是原型链攻击面（渲染器用 Object.hasOwn 兜住），但长度仍要截断；
+      // `size` 走 clamp。未知名字不在这里判死——渲染层降级成圆点。
+      const name = str(v.name, 64)
+      if (name === undefined) return null
+      return {
+        type: 'icon', name,
+        ...opt('label', str(v.label, GENUI_LIMITS.maxString)),
+        ...opt('tone', enu(v.tone, ICON_TONES)),
+        ...opt('size', int(v.size, 8, 96)),
+        ...opt('tile', v.tile === true ? true : undefined),
+      }
+    }
+    case 'blocks': {
+      // rows/cells 是数据不是节点，此前走 default 透传，于是颜色绕过了
+      // color()/SAFE_COLOR_RE、字符串绕过了 maxString。这里补齐：
+      // 颜色只接受字面色或宿主令牌，字符串按 maxString 截断，行/格按 limits 截断。
+      if (!Array.isArray(v.rows)) return null
+      const rows = v.rows.slice(0, GENUI_LIMITS.maxBlocksRows).flatMap((entry) => {
+        const row = obj(entry)
+        if (row === undefined || !Array.isArray(row.cells)) return []
+        const cells = row.cells.slice(0, GENUI_LIMITS.maxBlocksCells).map((cell) => {
+          if (cell === null) return null
+          if (typeof cell === 'string') return str(cell, GENUI_LIMITS.maxString) ?? ''
+          const holder = obj(cell)
+          if (holder === undefined) return null
+          const text = str(holder.text, GENUI_LIMITS.maxString)
+          if (text === undefined) return null
+          return {
+            text,
+            ...opt('color', color(holder.color)),
+            ...opt('tone', enu(holder.tone, BLOCK_CELL_TONES)),
+            ...opt('sub', str(holder.sub, 128)),
+          }
+        })
+        return [{
+          cells,
+          ...opt('label', str(row.label, 128)),
+          ...opt('color', color(row.color)),
+          ...opt('variant', enu(row.variant, BLOCKS_VARIANTS)),
+        }]
+      })
+      if (rows.length === 0) return null
+      return {
+        type: 'blocks', rows,
+        ...opt('columns', int(v.columns, 1, GENUI_LIMITS.maxBlocksCells)),
+        ...opt('title', str(v.title, GENUI_LIMITS.maxString)),
+        ...opt('caption', str(v.caption, GENUI_LIMITS.maxString)),
+      }
+    }
+    case 'arrow': {
+      return {
+        type: 'arrow',
+        ...opt('dir', enu(v.dir, ARROW_DIRS)),
+        ...opt('length', int(v.length, 16, 96)),
+        ...opt('label', str(v.label, 200)),
+      }
+    }
     case 'row': {
-      return { type: 'row', items: repairItems(v.items, ctx, depth + 1), ...opt('wrap', v.wrap === true ? true : undefined), ...opt('spacer', v.spacer === true ? true : undefined) }
+      return {
+        type: 'row',
+        items: repairItems(v.items, ctx, depth + 1),
+        ...opt('wrap', v.wrap === true ? true : undefined),
+        ...opt('spacer', v.spacer === true ? true : undefined),
+        // Repair rebuilds every node from a hand-written field list, so a
+        // schema-only addition is silently dropped here. Keep the two in sync:
+        // figure headers need `justify: "center"` (icon + title over a caption).
+        ...opt('justify', enu(v.justify, ROW_JUSTIFY)),
+      }
     }
     case 'col': {
-      return { type: 'col', items: repairItems(v.items, ctx, depth + 1), ...opt('gap', num(v.gap, 0, 96)) }
+      return {
+        type: 'col',
+        items: repairItems(v.items, ctx, depth + 1),
+        ...opt('gap', num(v.gap, 0, 96)),
+        ...opt('width', num(v.width, 1, 100)),
+      }
     }
     case 'grid': {
       return { type: 'grid', cols: int(v.cols, 1, GENUI_LIMITS.maxGridCols) ?? 1, items: repairItems(v.items, ctx, depth + 1) }
@@ -296,6 +370,7 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
         ...opt('title', str(v.title, GENUI_LIMITS.maxString)),
         ...opt('tone', enu(v.tone, CARD_TONES)),
         ...opt('accent', color(v.accent)),
+        ...opt('flat', v.flat === true ? true : undefined),
       }
     }
     case 'button': {
@@ -1980,6 +2055,36 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
       if (typeof v.question !== 'string') errors.push(`${at}: type 'quiz' requires question (string)`)
       if (!Array.isArray(v.options)) errors.push(`${at}: type 'quiz' requires options (array)`)
       break
+    case 'blocks': {
+      // cells 是联合类型（string | null | record），无法挂到 schema 的 nested 上，
+      // 所以在这里显式校验对象那一半的形状与枚举。
+      if (!Array.isArray(v.rows)) { errors.push(`${at}: type 'blocks' requires rows (array)`); break }
+      isNum('columns')
+      v.rows.forEach((entry, i) => {
+        const row = obj(entry)
+        if (row === undefined) { errors.push(`${at}.rows[${i}] must be an object`); return }
+        if (!Array.isArray(row.cells)) { errors.push(`${at}.rows[${i}].cells must be an array`); return }
+        row.cells.forEach((cell, j) => {
+          if (cell === null || typeof cell === 'string') return
+          const holder = obj(cell)
+          if (holder === undefined) { errors.push(`${at}.rows[${i}].cells[${j}] must be a string, null, or object`); return }
+          if (typeof holder.text !== 'string') errors.push(`${at}.rows[${i}].cells[${j}].text must be a string`)
+          if (holder.tone !== undefined && !BLOCK_CELL_TONES.includes(holder.tone as never)) {
+            errors.push(`${at}.rows[${i}].cells[${j}].tone must be one of ${BLOCK_CELL_TONES.join(', ')}`)
+          }
+          if (holder.color !== undefined && color(holder.color) === undefined) {
+            errors.push(`${at}.rows[${i}].cells[${j}].color must be a literal colour or host token`)
+          }
+        })
+      })
+      break
+    }
+    case 'icon':
+      if (typeof v.name !== 'string') errors.push(`${at}: type 'icon' requires name (string)`)
+      isNum('size')
+      break
+    case 'arrow':
+      break
     case 'diagram':
       if (typeof v.kind !== 'string') errors.push(`${at}: type 'diagram' requires kind (string)`)
       if (!Array.isArray(v.nodes)) errors.push(`${at}: type 'diagram' requires nodes (array)`)
@@ -1997,9 +2102,16 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
       isNum('height')
       break
     default:
-      // Unknown type: plugin-registered custom nodes are valid when a
-      // renderer exists; the guard cannot know, so report as a warning.
-      errors.push(`${at}: unknown type '${type}' (custom renderer?)`)
+      // Registered native types (icon/blocks/arrow/…) reach here because this
+      // switch is a second, hand-written table. Falling through to "unknown
+      // type" made validateGenuiSpec() answer false for perfectly valid specs
+      // — the render pipeline only survived because processGenuiSpec filters
+      // that one error string. Consult the schema instead: anything registered
+      // is validated by validateRegistryFields below, and only genuinely
+      // unregistered types are reported as custom-renderer unknowns.
+      if (!Object.hasOwn(COMPONENT_SCHEMAS, type)) {
+        errors.push(`${at}: unknown type '${type}' (custom renderer?)`)
+      }
   }
   const definition = COMPONENT_SCHEMAS[type]
   if (definition !== undefined) {
