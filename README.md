@@ -71,7 +71,7 @@ The walkthrough moves from an answer-embedded panel through forms, plotting, Mer
 
 ## ⚠️ Read this first: DSH compatibility
 
-The browser plugin observes the DSH conversation DOM and mounts GenUI in plugin-owned React roots. It supports DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`, with continuous checks against the minimum `dsh-v0.2.0-rc.1` and current `dsh-v0.2.1-rc.1` releases. Streaming rendering shows each completed component as the model writes it. Fence discovery supports the stock `md-code-block` surface, `.code-block` and `.code-block-small`, plus any element whose banner labels it `dsh-ui` and contains a `<pre>` body.
+The browser plugin observes the DSH conversation DOM and mounts GenUI in plugin-owned React roots. It supports DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`, including `0.2.1-rc.2`, with continuous checks against the minimum `dsh-v0.2.0-rc.1` and current `dsh-v0.2.1-rc.2` releases. Streaming rendering shows each completed component as the model writes it. Fence discovery supports the stock `md-code-block` surface, `.code-block` and `.code-block-small`, plus any element whose banner labels it `dsh-ui` and contains a `<pre>` body.
 
 CI's packed host smoke installs the generated npm tarball in a real DSH host and verifies host startup and rendering. Source-backed fence routing is covered by integration tests; the smoke does not claim to validate a real model response. Real-model E2E requires configured model credentials.
 
@@ -90,7 +90,7 @@ The repository ships the host plugin and built browser bundle. The host still ow
 
 Prerequisites — all required:
 
-1. **dsh `^0.2.0-rc.1 || ^0.2.1-rc.1`** (verified host roles: minimum `dsh-v0.2.0-rc.1`, current `dsh-v0.2.1-rc.1`)
+1. **dsh `^0.2.0-rc.1 || ^0.2.1-rc.1`** (verified host roles: minimum `dsh-v0.2.0-rc.1`, current `dsh-v0.2.1-rc.2`)
 2. **`pnpm` on your PATH**: the `dsh plugin` command depends on it. If missing: `corepack enable` (or `npm i -g pnpm`), then **open a new terminal** and confirm `pnpm -v` prints a version
 
 Install and activate in DSH (one command, all dependencies included):
@@ -246,7 +246,7 @@ pnpm install
 pnpm run check   # type check + full tests + build
 ```
 
-With the locked dependencies installed, `pnpm run check` runs type checking, the full unit test suite, the build, and standalone checks against DSH `0.2.1-rc.1` packages. CI also checks DSH `0.2.0-rc.1` on Node 24 and DSH `0.2.1-rc.1` on Node 22 and 24. Each lane runs the host API checks and installs the generated tarball in its pinned DSH checkout for a packed smoke.
+With the locked dependencies installed, `pnpm run check` runs type checking, the full unit test suite, the build, and standalone checks against DSH `0.2.1-rc.1` packages. CI also checks DSH `0.2.0-rc.1` on Node 24 and DSH `0.2.1-rc.2` on Node 22 and 24. Each lane runs the host API checks and installs the generated tarball in its pinned DSH checkout for a packed smoke.
 
 Run `node scripts/verify-pack.mjs --keep` to retain the verified tarball for inspection or e2e use. The default `node scripts/verify-pack.mjs` removes its temporary directory after verification.
 
@@ -255,23 +255,23 @@ Run `node scripts/verify-pack.mjs --keep` to retain the verified tarball for ins
 The real chain end to end: start a temporary dsh web → install the plugin → send a message in a browser so the model outputs a `dsh-ui` fence → assert the rendering → click an action button → assert the model responds (event-loop closure):
 
 ```sh
-export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.1
+export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.2
 export DSH_BIN="$DSH_ROOT/apps/cli/lib/bin.js"
 DEEPSEEK_API_KEY=sk-... node scripts/e2e.mjs          # link-installs the current workspace
 ```
 
-Build the DSH `0.2.1-rc.1` checkout first. Set `DSH_ROOT` to that checkout and `DSH_BIN` to its `apps/cli/lib/bin.js`, as shown above; also provide `pnpm`, `DEEPSEEK_API_KEY`, and the main repo's web build output. On PASS it saves an `e2e-final.png` screenshot.
+Build the DSH `0.2.1-rc.2` checkout first. Set `DSH_ROOT` to that checkout and `DSH_BIN` to its `apps/cli/lib/bin.js`, as shown above; also provide `pnpm`, `DEEPSEEK_API_KEY`, and the main repo's web build output. On PASS it saves an `e2e-final.png` screenshot.
 
 ### Visual e2e (no model key)
 
-For style/component iterations, a visual smoke that needs no API key: boots a real DSH `0.2.1-rc.1` checkout with the plugin link-installed, injects the component gallery fence through the DOM channel, renders it in headless Chrome, screenshots the full page, and exercises local interactions (table sort, quiz judging, tree collapse, numeric alignment) with hard assertions. Set `DSH_ROOT` and `DSH_BIN` to that checkout as shown above before running it.
+For style/component iterations, a visual smoke that needs no API key: boots a real DSH `0.2.1-rc.2` checkout with the plugin link-installed, injects the component gallery fence through the DOM channel, renders it in headless Chrome, screenshots the full page, and exercises local interactions (table sort, quiz judging, tree collapse, numeric alignment) with hard assertions. Set `DSH_ROOT` and `DSH_BIN` to that checkout as shown above before running it.
 
 ```sh
 npx tsx scripts/e2e-visual.mts          # → .e2e-artifacts/gallery.png + interactions.png
 npx tsx scripts/e2e-visual.mts --keep   # keep the scratch DSH_HOME for debugging
 ```
 
-Overridable: `--port 3098`, `--out <dir>`, `DSH_BIN` (set it to the `apps/cli/lib/bin.js` inside the DSH `0.2.1-rc.1` checkout), `PLAYWRIGHT_PATH` (defaults to the global playwright-core).
+Overridable: `--port 3098`, `--out <dir>`, `DSH_BIN` (set it to the `apps/cli/lib/bin.js` inside the DSH `0.2.1-rc.2` checkout), `PLAYWRIGHT_PATH` (defaults to the global playwright-core).
 
 ## 🗺️ Roadmap (evaluated)
 

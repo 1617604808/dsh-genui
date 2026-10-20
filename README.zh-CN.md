@@ -71,7 +71,7 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 
 ## ⚠️ 先看这里：DSH 兼容范围
 
-浏览器插件会观察 DSH 对话 DOM，并在插件自己的 React root 中显示 GenUI。支持 DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`，持续检查最低版本 `dsh-v0.2.0-rc.1` 和当前版本 `dsh-v0.2.1-rc.1`。流式渲染会随着模型输出显示已完成的组件。围栏识别支持标准 `md-code-block`、`.code-block`、`.code-block-small`，以及 banner 标注 `dsh-ui` 且含 `<pre>` 正文的元素。
+浏览器插件会观察 DSH 对话 DOM，并在插件自己的 React root 中显示 GenUI。支持 DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`，其中已包含 `0.2.1-rc.2`；持续检查最低版本 `dsh-v0.2.0-rc.1` 和当前版本 `dsh-v0.2.1-rc.2`。流式渲染会随着模型输出显示已完成的组件。围栏识别支持标准 `md-code-block`、`.code-block`、`.code-block-small`，以及 banner 标注 `dsh-ui` 且含 `<pre>` 正文的元素。
 
 CI 的 packed host smoke 会把实际生成的 npm tarball 安装到真实 DSH 宿主，并验证宿主启动与界面渲染。source-backed 围栏识别由 integration tests 覆盖；该 smoke 不代表真实模型回复验收。真实模型 E2E 需要配置模型凭据。
 
@@ -90,7 +90,7 @@ CI 的 packed host smoke 会把实际生成的 npm tarball 安装到真实 DSH �
 
 前置条件，缺一不可：
 
-1. **dsh `^0.2.0-rc.1 || ^0.2.1-rc.1`**（已验证宿主角色：最低版本 `dsh-v0.2.0-rc.1`、当前版本 `dsh-v0.2.1-rc.1`）
+1. **dsh `^0.2.0-rc.1 || ^0.2.1-rc.1`**（已验证宿主角色：最低版本 `dsh-v0.2.0-rc.1`、当前版本 `dsh-v0.2.1-rc.2`）
 2. **`pnpm` 在 PATH 上**：`dsh plugin` 命令依赖它。没有就 `corepack enable`（或 `npm i -g pnpm`），然后**新开一个终端**，确认 `pnpm -v` 有输出
 
 安装并在 DSH 中激活（一行命令，自动带上全部依赖）：
@@ -260,7 +260,7 @@ pnpm install
 pnpm run check   # 类型检查 + 全量测试 + 构建
 ```
 
-安装锁定依赖后，`pnpm run check` 会使用 DSH `0.2.1-rc.1` 包运行类型检查、全量单元测试、构建和 standalone 检查。CI 还会在 Node 24 检查 DSH `0.2.0-rc.1`，并在 Node 22、24 检查 DSH `0.2.1-rc.1`。每条 CI lane 都会检查宿主 API，并把生成的 tarball 安装到固定版本的 DSH checkout 中运行 packed smoke。
+安装锁定依赖后，`pnpm run check` 会使用 DSH `0.2.1-rc.1` 包运行类型检查、全量单元测试、构建和 standalone 检查。CI 还会在 Node 24 检查 DSH `0.2.0-rc.1`，并在 Node 22、24 检查 DSH `0.2.1-rc.2`。每条 CI lane 都会检查宿主 API，并把生成的 tarball 安装到固定版本的 DSH checkout 中运行 packed smoke。
 
 运行 `node scripts/verify-pack.mjs --keep` 可保留已验收的 tarball，便于检查或运行 e2e；默认的 `node scripts/verify-pack.mjs` 会在验收后清理临时目录。
 
@@ -269,23 +269,23 @@ pnpm run check   # 类型检查 + 全量测试 + 构建
 真实链路验证：起一个临时 dsh web → 装上插件 → 浏览器里发消息让模型输出 `dsh-ui` fence → 断言渲染 → 点击 action 按钮 → 断言模型响应（事件循环闭环）：
 
 ```sh
-export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.1
+export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.2
 export DSH_BIN="$DSH_ROOT/apps/cli/lib/bin.js"
 DEEPSEEK_API_KEY=sk-... node scripts/e2e.mjs          # link 安装当前工作区
 ```
 
-先构建 DSH `0.2.1-rc.1` checkout。按上面的示例将 `DSH_ROOT` 指向该 checkout，将 `DSH_BIN` 指向其中的 `apps/cli/lib/bin.js`；另需准备 `pnpm`、`DEEPSEEK_API_KEY` 和主仓 web 构建产物。PASS 时保存 `e2e-final.png` 截图。
+先构建 DSH `0.2.1-rc.2` checkout。按上面的示例将 `DSH_ROOT` 指向该 checkout，将 `DSH_BIN` 指向其中的 `apps/cli/lib/bin.js`；另需准备 `pnpm`、`DEEPSEEK_API_KEY` 和主仓 web 构建产物。PASS 时保存 `e2e-final.png` 截图。
 
 ### 视觉 e2e（无需模型 key）
 
-样式/组件迭代用：使用 DSH `0.2.1-rc.1` checkout 起真实 dsh web + link 安装插件 → 通过 DOM 通道注入组件画廊围栏 → headless Chrome 全页截图 + 本地交互（表格排序 / 判题 / 目录折叠 / 数值对齐）硬断言，不需要任何模型额度。运行前按上面的示例将 `DSH_ROOT` 和 `DSH_BIN` 指向该 checkout：
+样式/组件迭代用：使用 DSH `0.2.1-rc.2` checkout 起真实 dsh web + link 安装插件 → 通过 DOM 通道注入组件画廊围栏 → headless Chrome 全页截图 + 本地交互（表格排序 / 判题 / 目录折叠 / 数值对齐）硬断言，不需要任何模型额度。运行前按上面的示例将 `DSH_ROOT` 和 `DSH_BIN` 指向该 checkout：
 
 ```sh
 npx tsx scripts/e2e-visual.mts          # → .e2e-artifacts/gallery.png + interactions.png
 npx tsx scripts/e2e-visual.mts --keep   # 保留 scratch DSH_HOME 便于排查
 ```
 
-可覆盖：`--port 3098`、`--out <dir>`、`DSH_BIN`（设为 DSH `0.2.1-rc.1` checkout 内的 `apps/cli/lib/bin.js`）、`PLAYWRIGHT_PATH`（默认全局 playwright-core）。
+可覆盖：`--port 3098`、`--out <dir>`、`DSH_BIN`（设为 DSH `0.2.1-rc.2` checkout 内的 `apps/cli/lib/bin.js`）、`PLAYWRIGHT_PATH`（默认全局 playwright-core）。
 
 ## 🗺️ Roadmap（已评估项）
 
