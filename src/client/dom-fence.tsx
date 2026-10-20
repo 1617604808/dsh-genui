@@ -839,6 +839,14 @@ export function installDomFenceRenderer(
   // visible diagnostic explains why (issue #158). Kept apart from `mounts`
   // because a diagnosed block is never hidden.
   const diagnostics = new Map<HTMLElement, { container: HTMLElement; root: Root; raw: string }>()
+  /** Reverse lookup for host surgery: a container wipe must not search every
+   * mounted root. Entries are replaced/deleted with their owning root. */
+  const containerBlocks = new WeakMap<Node, HTMLElement>()
+  /** Existing roots affected by this observer batch. Discovery has its own
+   * queue; a text change in one fence must not re-read the whole transcript. */
+  const dirtyMounts = new Set<HTMLElement>()
+  const dirtyDiagnostics = new Set<HTMLElement>()
+  let fullMaintenance = false
   let disposed = false
   let rafId: number | null = null
   let activeChatSession: SessionId | undefined
@@ -897,6 +905,7 @@ export function installDomFenceRenderer(
       unsubscribeChat?.()
       unsubscribeChat = undefined
       activeChatSession = sessionId
+      fullMaintenance = true
     }
     if (sessionId !== undefined && unsubscribeChat === undefined) {
       unsubscribeChat = chatSourceOf(ctx, sessionId)?.subscribe(() => {
@@ -935,6 +944,8 @@ export function installDomFenceRenderer(
     const mount = mounts.get(block)
     if (mount === undefined) return
     mounts.delete(block)
+    dirtyMounts.delete(block)
+    containerBlocks.delete(mount.container)
     mount.root.unmount()
     mount.container.remove()
     block.style.display = ''
@@ -947,6 +958,8 @@ export function installDomFenceRenderer(
     const diagnostic = diagnostics.get(block)
     if (diagnostic === undefined) return
     diagnostics.delete(block)
+    dirtyDiagnostics.delete(block)
+    containerBlocks.delete(diagnostic.container)
     try {
       diagnostic.root.unmount()
     } catch {
@@ -997,6 +1010,7 @@ export function installDomFenceRenderer(
       return
     }
     diagnostics.set(block, { container, root, raw })
+    containerBlocks.set(container, block)
   }
 
   /**
@@ -1104,6 +1118,7 @@ export function installDomFenceRenderer(
     block.style.display = 'none'
     block.setAttribute(PROCESSED, '')
     mounts.set(block, { root, container, block, lastRaw: raw, lastSettled: settled, language: acceptedLanguage, lastNode: payload, skeleton: node === null })
+    containerBlocks.set(container, block)
   }
 
   /** Queue a block for takeover. A block already taken over is skipped here:
@@ -1248,7 +1263,7 @@ export function installDomFenceRenderer(
     if (disposed) return
     const element = node instanceof Element ? node : node.parentElement
     if (element === null) return
-    if (element.closest(`.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}`) !== null) return
+    if (element.closest(IGNORED_MUTATION_SCOPE) !== null) return
     const known = dirtyTargets.get(node)
     if (known === undefined) {
       if (dirtyTargets.size >= DIRTY_TARGET_LIMIT) return
@@ -1290,28 +1305,58 @@ export function installDomFenceRenderer(
     rotationNext = (rotationNext + visited) % total
   }
 
+  /** Mark the existing root owning a changed node, without scanning unrelated
+   * blocks. Walking parents also covers unknown-class and tag-text surfaces. */
+  function markOwnedAncestors(node: Node | null): void {
+    for (let current = node; current !== null; current = current.parentNode) {
+      const block = containerBlocks.get(current) ?? current
+      if (!(block instanceof HTMLElement)) continue
+      if (mounts.has(block)) dirtyMounts.add(block)
+      if (diagnostics.has(block)) dirtyDiagnostics.add(block)
+    }
+  }
+
+  /** Structural changes can remove/move a whole row. Query only that changed
+   * subtree, including detached nodes; text updates never take this path. */
+  function markOwnedSubtree(node: Node): void {
+    markOwnedAncestors(node)
+    if (!(node instanceof Element)) return
+    // Plugin-owned children cannot contain host fences. The container itself
+    // was already resolved above, including a detached/emptied container.
+    if (containerBlocks.has(node) || node.closest(IGNORED_MUTATION_SCOPE) !== null) return
+    for (const element of node.querySelectorAll(`[${PROCESSED}], .${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}`)) {
+      markOwnedAncestors(element)
+    }
+  }
+
   /** Pre-paint repair: the host's React re-renders during streaming can wipe
    * our foreign container or reset the hide. Re-apply the surgery in the
    * observer microtask (before paint) so raw JSON never flashes between
    * chunks; the rAF sweep re-renders React state at its own pace. */
-  function repairSurgery(): void {
+  function repairSurgery(mountBlocks: Iterable<HTMLElement>, diagnosticBlocks: Iterable<HTMLElement>): void {
     // Diagnostics are plugin-owned DOM too: a host re-render that detaches or
     // empties their container must be repaired before paint.
-    for (const [block, diagnostic] of Array.from(diagnostics)) {
+    for (const block of diagnosticBlocks) {
+      const diagnostic = diagnostics.get(block)
+      if (diagnostic === undefined) continue
       if (!block.isConnected) {
         clearDiagnostic(block)
         continue
       }
-      renderDiagnostic(block, diagnostic.raw)
+      // This strip has already been validated. Reattachment needs no parse
+      // and no React render inside the observer microtask.
+      if (diagnostic.container.parentElement !== block.parentElement
+          || diagnostic.container.nextElementSibling !== block) block.before(diagnostic.container)
     }
-    for (const mount of Array.from(mounts.values())) {
-      const block = mount.block
+    for (const block of mountBlocks) {
+      const mount = mounts.get(block)
+      if (mount === undefined) continue
       // The host replaced the row: the stock block is gone but our foreign
       // container may still be attached. Drop the mount NOW (removes the
       // orphan container) instead of waiting for the sweep — the new block
       // will be taken over by the sweep's discovery pass.
       if (!block.isConnected) {
-        if (mount.container.isConnected) unmountBlock(block)
+        unmountBlock(block)
         continue
       }
       // Re-attach the container BEFORE re-hiding (issue #19: never hide the
@@ -1327,6 +1372,8 @@ export function installDomFenceRenderer(
         block.style.display = ''
         block.removeAttribute(PROCESSED)
         mounts.delete(block)
+        dirtyMounts.delete(block)
+        containerBlocks.delete(mount.container)
         try {
           mount.root.unmount()
         } catch {
@@ -1345,14 +1392,24 @@ export function installDomFenceRenderer(
    * the streaming→settled transition), repair surgery, re-check what the
    * session source may have unlocked, then take over the dsh-ui blocks
    * discovery queued — settled or still streaming. */
-  function sweep(): void {
+  function sweep(full = false): void {
     if (disposed) return
     sourceLanguages.beginSweep()
     const sourceSession = sourceSessionOf(ctx)
     const sessionId = sourceSession.available ? sourceSession.sessionId : undefined
     if (sourceSession.available) lastAvailableSessionId = sourceSession.sessionId
     syncChatSubscription(sessionId)
-    for (const [block, mount] of mounts) {
+    // Source/session notifications are global invalidations, unlike DOM
+    // updates. The slow sweep deliberately retains the complete safety net.
+    const all = full || fullMaintenance || sourceChanged
+    fullMaintenance = false
+    const mountBlocks = Array.from(all ? mounts.keys() : dirtyMounts)
+    const diagnosticBlocks = Array.from(all ? diagnostics.keys() : dirtyDiagnostics)
+    dirtyMounts.clear()
+    dirtyDiagnostics.clear()
+    for (const block of mountBlocks) {
+      const mount = mounts.get(block)
+      if (mount === undefined) continue
       if (!block.isConnected) {
         unmountBlock(block)
         continue
@@ -1410,6 +1467,7 @@ export function installDomFenceRenderer(
           }
           const fresh = document.createElement('div')
           fresh.className = CONTAINER_CLASS
+          containerBlocks.delete(mount.container)
           mount.container.remove()
           block.after(fresh)
           try {
@@ -1418,6 +1476,7 @@ export function installDomFenceRenderer(
             freshRoot.render(wrapFenceNode(node, context, handler, !settled))
             mount.root = freshRoot
             mount.container = fresh
+            containerBlocks.set(fresh, block)
           } catch (error) {
             // Never leave the stock block hidden behind a broken root:
             // restore the raw code block and drop the mount (issue #19).
@@ -1446,11 +1505,13 @@ export function installDomFenceRenderer(
         mount.skeleton = false
       }
     }
-    repairSurgery()
+    repairSurgery(mountBlocks, diagnosticBlocks)
     // Diagnostics for blocks that are gone or were taken over must go with
     // them; one whose DOM the host wiped is rebuilt here (sweep cadence, never
     // inside the mutation callback).
-    for (const [block, diagnostic] of Array.from(diagnostics)) {
+    for (const block of diagnosticBlocks) {
+      const diagnostic = diagnostics.get(block)
+      if (diagnostic === undefined) continue
       if (!block.isConnected || block.hasAttribute(PROCESSED)) {
         clearDiagnostic(block)
         continue
@@ -1489,7 +1550,10 @@ export function installDomFenceRenderer(
   }
 
   const unsubscribeSessions = typeof ctx.sessions.list.subscribe === 'function'
-    ? ctx.sessions.list.subscribe(schedule)
+    ? ctx.sessions.list.subscribe(() => {
+      fullMaintenance = true
+      schedule()
+    })
     : undefined
 
   const observer = new MutationObserver(records => {
@@ -1501,8 +1565,10 @@ export function installDomFenceRenderer(
     for (const record of [...records].reverse()) {
       if (record.removedNodes.length === 0 || record.target.childNodes.length > 0) continue
       const target = record.target
-      const mount = [...mounts.values()].find(candidate => candidate.container === target)
-      if (mount !== undefined) {
+      const owner = containerBlocks.get(target)
+      const mount = owner === undefined ? undefined : mounts.get(owner)
+      if (mount !== undefined && mount.container === target) {
+        dirtyMounts.add(mount.block)
         relevant = true
         if (!mount.block.isConnected || isPanelRoot(mount.lastNode)) continue
         mount.container.append(...record.removedNodes)
@@ -1510,43 +1576,49 @@ export function installDomFenceRenderer(
       }
       // The same surgery for a visible diagnostic the host emptied: re-append
       // its own nodes instead of leaving the author without an explanation.
-      const diagnostic = [...diagnostics.values()].find(candidate => candidate.container === target)
-      if (diagnostic !== undefined) {
+      const diagnostic = owner === undefined ? undefined : diagnostics.get(owner)
+      if (diagnostic !== undefined && diagnostic.container === target) {
+        dirtyDiagnostics.add(owner!)
         relevant = true
         diagnostic.container.append(...record.removedNodes)
       }
     }
-    // Everything else can only change a fence where a fence can live: the
-    // composer and plugin-owned trees cannot hold a host fence. Sidebars can
-    // contain assistant replies, so they retain normal incremental discovery.
-    if (!relevant) {
-      for (const record of records) {
-        const node = record.target instanceof Element ? record.target : record.target.parentElement
-        if (node === null || node.closest(IGNORED_MUTATION_SCOPE) === null) {
-          relevant = true
-          break
-        }
-      }
-    }
-    if (!relevant) return
+    // Filter each record, not just the batch: a simultaneous composer or
+    // plugin commit must not turn an unrelated subtree into maintenance work.
     for (const record of records) {
-      // Structure, and the streaming→settled flip, can unlock a whole subtree
-      // (a history load, a session switch, a row that stopped streaming): those
-      // get the subtree pass. Text growth is the streaming case and stays on
-      // the cheap surface path.
+      const element = record.target instanceof Element ? record.target : record.target.parentElement
+      if (element !== null && element.closest(IGNORED_MUTATION_SCOPE) !== null) continue
+      relevant = true
+      markOwnedAncestors(record.target)
       if (record.type === 'characterData') {
         markDirty(record.target, false)
         continue
       }
       if (record.type === 'childList') {
-        for (const node of record.addedNodes) markDirty(node, true)
+        // The target matters even when no nodes were added (an emptied body
+        // or removed banner). Skip layout-only targets: our own root writes
+        // must not spend discovery budget ahead of pending takeovers.
+        // Neighbors catch insertion between block/root.
+        if (element !== null && (element.tagName === 'SPAN' || element.closest(CODE_CONTEXT) !== null)) {
+          markDirty(record.target, false)
+        }
+        markOwnedAncestors(record.previousSibling)
+        markOwnedAncestors(record.nextSibling)
+        for (const node of record.removedNodes) markOwnedSubtree(node)
+        for (const node of record.addedNodes) {
+          markOwnedSubtree(node)
+          markDirty(node, true)
+        }
         continue
       }
+      // data-streaming applies to all mounted descendants of its row.
+      markOwnedSubtree(record.target)
       markDirty(record.target, true)
     }
-    // Pre-paint pass: surgery repair only (cheap DOM ops); the React
-    // re-render goes through the rAF-scheduled sweep.
-    repairSurgery()
+    if (!relevant) return
+    // Pre-paint surgery stays synchronous, but only for affected roots.
+    // Keep their dirty flags for the subsequent React maintenance sweep.
+    repairSurgery(Array.from(dirtyMounts), Array.from(dirtyDiagnostics))
     schedule()
   })
   observer.observe(document.body, {
@@ -1560,7 +1632,7 @@ export function installDomFenceRenderer(
   })
   let slowTicks = 0
   const interval = window.setInterval(() => {
-    sweep()
+    sweep(true)
     // The rotation is the net for changes the observer cannot see, so it rides
     // the slow tick only every ROTATION_TICKS of them: it re-queries the whole
     // transcript, and on a streaming page the sweep already runs per frame.
@@ -1589,6 +1661,8 @@ export function installDomFenceRenderer(
       rafId = null
     }
     dirtyTargets.clear()
+    dirtyMounts.clear()
+    dirtyDiagnostics.clear()
     pendingCandidates.clear()
     awaitingSource.clear()
     for (const block of Array.from(mounts.keys())) unmountBlock(block)
