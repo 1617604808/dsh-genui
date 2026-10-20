@@ -257,6 +257,9 @@ export const ZH: Record<keyof typeof EN, string> = {
   'ach.template-1.desc': '从模板中心试用了一个模板。',
 
   // ------------------------------------------------- primitive chrome
+  'label.copyViewText': '查看文本',
+  'label.copyHideText': '收起文本',
+  'label.copyPreviewTruncated': '预览已截断，复制仍包含组件的完整文本。',
   'label.copy': '复制',
   'label.copied': '复制成功',
   'label.copiedDone': '已复制',

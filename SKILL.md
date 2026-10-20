@@ -101,7 +101,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 - textarea: `{"type":"textarea","label":"...","placeholder":"...","rows":n?,"value":"...","action":"save"?,"id":"field-id"?}` — action 在失焦和 **Ctrl/Cmd+Enter** 时触发；blur 仅值有变化才发送；带 `id` 的值刷新后保留
 - tabs: `{"type":"tabs","tabs":[{"label":"...","items":[...]}]}` — 空 tab 可以省略 `items`，会按空数组处理
 - accordion: `{"type":"accordion","items":[{"title":"...","items":[...]}]}`
-- copy: `{"type":"copy","label":"<user-language action>","text":"<user-language text>"}`
+- copy: `{"type":"copy","label":"<user-language action>","text":"<user-language text>","expandable":true?,"previewLines":n?}` · [docs/copy-preview.md](docs/copy-preview.md)
 
 **状态持久化（v2.7）**：radio 答案、checkbox 分组选择、交卷锁定、输入值按「会话 + 内容指纹」自动保存——用户刷新页面/重开会话，同一块 UI 的状态原样恢复；你重渲染**相同内容**会保留用户状态，渲染**新内容**（换题等）自动从头开始。
 
