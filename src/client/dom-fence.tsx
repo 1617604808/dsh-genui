@@ -130,7 +130,7 @@ const TAG_TEXT_EXCLUDES = `.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat
  * `repairSurgery` and scheduled a sweep, which on a long transcript is a frame
  * of work per key.
  */
-const IGNORED_MUTATION_SCOPE = `.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-genui-panel], [data-genui-tool], [data-composer-seat], [data-composer-input], [data-sidebar-right-panel], [data-sidebar-chat], [data-panel-conversation], [data-plugin-panel]`
+const IGNORED_MUTATION_SCOPE = `${SURFACE_EXCLUDES}, [data-composer-seat], [data-composer-input]`
 /** Slow sweep interval: the observer catches everything, this is the 1s
  * belt-and-braces pass (history loads, missed attribute batches). */
 const SWEEP_MS = 1000
@@ -1492,8 +1492,8 @@ export function installDomFenceRenderer(
       }
     }
     // Everything else can only change a fence where a fence can live: the
-    // composer, our own mounted trees and the side panels cannot hold one, and
-    // typing into the composer must not schedule a transcript pass.
+    // composer and plugin-owned trees cannot hold a host fence. Sidebars can
+    // contain assistant replies, so they retain normal incremental discovery.
     if (!relevant) {
       for (const record of records) {
         const node = record.target instanceof Element ? record.target : record.target.parentElement
