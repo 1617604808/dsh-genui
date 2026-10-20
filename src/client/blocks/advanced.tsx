@@ -120,11 +120,12 @@ export const CodeNode = memo(function CodeNode({ node }: { node: GenuiCode }) {
  * round trip. Numeric cells (numbers or numeric strings) compare numerically;
  * everything else compares as text.
  */
-export function TabsNode({ tabs, onAction, depth = 0, answers }: {
+export function TabsNode({ tabs, onAction, depth = 0, answers, path = '' }: {
   tabs: GenuiTabs
   onAction?: GenuiBlockProps['onAction']
   depth?: number
   answers?: AnswersState | undefined
+  path?: string
 }) {
   const [active, setActive] = useState(0)
   const uid = useId()
@@ -171,7 +172,7 @@ export function TabsNode({ tabs, onAction, depth = 0, answers }: {
       </div>
       {current !== undefined && (
         <div className={css.col} role="tabpanel" id={`${uid}-panel-${safeActive}`} aria-labelledby={`${uid}-tab-${safeActive}`}>
-          {current.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers))}
+          {current.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers, `${path}.tabs[${safeActive}].items[${i}]`))}
         </div>
       )}
     </div>
@@ -187,11 +188,12 @@ export function TabsNode({ tabs, onAction, depth = 0, answers }: {
  * carry `answer` data) or collects all groups in ONE action. Without
  * `group`, the legacy per-click action fires. After a local grading the
  * group locks until 重新作答 resets it. */
-export function AccordionNode({ node, onAction, depth = 0, answers }: {
+export function AccordionNode({ node, onAction, depth = 0, answers, path = '' }: {
   node: GenuiAccordion
   onAction?: GenuiBlockProps['onAction']
   depth?: number
   answers?: AnswersState | undefined
+  path?: string
 }) {
   const [open, setOpen] = useState<number | null>(0)
   const uid = useId()
@@ -213,7 +215,7 @@ export function AccordionNode({ node, onAction, depth = 0, answers }: {
           </button>
           {open === i && (
             <div className={css.accBody} id={`${uid}-body-${i}`} aria-labelledby={`${uid}-head-${i}`}>
-              {item.items.map((c, ci) => renderNode(c, ci, onAction, depth + 1, answers))}
+              {item.items.map((c, ci) => renderNode(c, ci, onAction, depth + 1, answers, `${path}.items[${i}].items[${ci}]`))}
             </div>
           )}
         </div>
@@ -263,13 +265,12 @@ function firstCopyLines(text: string, lines: number): string {
 /** Copy: a one-click copy chip, with an opt-in plain-text preview. The live region is a visually-hidden SIBLING
  * (not inside the button) — button content is atomic to screen readers, so a
  * live region inside it would never announce. */
-export const CopyNode = memo(function CopyNode({ node }: { node: GenuiCopy }) {
+export const CopyNode = memo(function CopyNode({ node, path }: { node: GenuiCopy; path?: string }) {
   const t = useT()
   const [copied, setCopied] = useState(false)
   const [localExpanded, setLocalExpanded] = useState(false)
   const previewState = useContext(CopyPreviewContext)
-  const path = previewState?.paths.get(node)
-  const expanded = path === undefined ? localExpanded : previewState!.expanded.has(path)
+  const expanded = path === undefined || previewState === undefined ? localExpanded : previewState.expanded.has(path)
   const previewId = useId()
   const chip = (
     <>
@@ -306,8 +307,8 @@ export const CopyNode = memo(function CopyNode({ node }: { node: GenuiCopy }) {
           aria-expanded={expanded}
           aria-controls={previewId}
           onClick={() => {
-            if (path === undefined) setLocalExpanded(value => !value)
-            else previewState!.toggle(path)
+            if (path === undefined || previewState === undefined) setLocalExpanded(value => !value)
+            else previewState.toggle(path)
           }}
         >
           {expanded ? t('label.copyHideText') : t('label.copyViewText')}

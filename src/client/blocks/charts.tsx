@@ -229,8 +229,9 @@ export const TableNode = memo(function TableNode({ node, renderDetail, filterVal
   /** Live value of `node.sortField`: a column header to sort by. */
   sortValue?: string | undefined
   /** Renders a row's detail nodes. Supplied by render-node so the table never
-   *  has to import the renderer back (import cycle). */
-  renderDetail?: ((items: NonNullable<GenuiTable['details']>[number] & object[]) => ReactNode) | undefined
+   *  has to import the renderer back (import cycle). The details lookup index
+   *  identifies the occurrence even when rows are sorted or arrays are reused. */
+  renderDetail?: ((items: NonNullable<GenuiTable['details']>[number] & object[], detailIndex: number) => ReactNode) | undefined
 }) {
   useT()
   const columns = node.columns.slice(0, GENUI_LIMITS.maxTableCols)
@@ -450,7 +451,7 @@ export const TableNode = memo(function TableNode({ node, renderDetail, filterVal
                         <tr className={css.detailRow}>
                           <td colSpan={columns.length}>
                             <div className={css.detailBody}>
-                              {renderDetail === undefined ? null : renderDetail(detail)}
+                              {renderDetail === undefined ? null : renderDetail(detail, child.index)}
                             </div>
                           </td>
                         </tr>
