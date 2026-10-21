@@ -272,7 +272,7 @@ it('restores distinct durable input state after disposing and reinstalling ancho
   document.body.append(first.row, second.row)
   let dispose = installDomFenceRenderer(context().ctx, () => {})
   try {
-    await until(() => second.block.nextElementSibling?.querySelector('input') !== null)
+    await until(() => second.block.nextElementSibling?.querySelector('input') != null)
     const input = second.block.nextElementSibling!.querySelector('input')!
     fireEvent.change(input, { target: { value: 'second only' } })
     // Production saves are debounced; disposing before the write cancels it.
