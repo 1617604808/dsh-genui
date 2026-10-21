@@ -132,6 +132,11 @@ const TAG_TEXT_EXCLUDES = `.${CONTAINER_CLASS}, .${DIAGNOSTIC_CLASS}, [data-chat
  * of work per key.
  */
 const IGNORED_MUTATION_SCOPE = `${SURFACE_EXCLUDES}, [data-composer-seat], [data-composer-input]`
+/** Host attributes used by discovery, language lookup and fallback row order. */
+const FENCE_ATTRIBUTES = ['data-streaming', 'class', 'data-code-block-content', 'data-code-block-banner',
+  'data-chat-anchor-key', 'data-chat-flow-key', 'data-chat-flow-kind', 'data-chat-node-key',
+  'data-chat-group-part', 'data-tool', 'data-sidebar-chat', 'data-sidebar-right-session',
+  'data-sidebar-right-panel', 'data-panel-conversation', 'data-plugin-panel', 'data-genui-svg-fence']
 /** Slow sweep interval: the observer catches everything, this is the 1s
  * belt-and-braces pass (history loads, missed attribute batches). */
 const SWEEP_MS = 1000
@@ -596,11 +601,11 @@ function rowOf(block: Element): Element {
 }
 
 /** Return a stable one-based ordinal among settled GenUI fences in this row. */
-function fenceIndexOf(ctx: Context, row: Element, block: Element, sourceLanguage: (block: Element) => string | null | undefined = candidate => sourceLanguageOf(ctx, candidate)): number {
-  if (!row.matches(ASSISTANT_FLOW_ROW) || row.getAttribute('data-chat-anchor-key') === null) {
-    const scope = row.getAttribute('data-chat-anchor-key') === null ? document : row
+function fenceIndexOf(row: Element, block: Element, sourceLanguage: (block: Element) => string | null | undefined, documentIndex: (block: Element) => number): number {
+  if (row.getAttribute('data-chat-anchor-key') === null) return documentIndex(block)
+  if (!row.matches(ASSISTANT_FLOW_ROW)) {
     let fallbackIndex = 0
-    for (const candidate of findFenceCandidates(scope)) {
+    for (const candidate of findFenceCandidates(row)) {
       if (candidate.closest(STREAMING) !== null) continue
       const language = resolveFenceLanguage(candidate, sourceLanguage)
       if (language !== 'dsh-ui' && !(language === undefined && isGenericGenuiFence(candidate, rawOf(candidate)))) continue
@@ -803,7 +808,7 @@ function chatSourceOf(ctx: Context, sessionId: SessionId): { getSnapshot: () => 
  * document-order index among chat rows — monotonic within the current
  * render window, degraded across reloads.
  */
-function anchorSeqOf(row: Element): number {
+function anchorSeqOf(row: Element, documentRowIndex: (row: Element) => number): number {
   const key = row.getAttribute('data-chat-anchor-key') ?? ''
   const turnStep = /assistant-step(\d+):(\d+)$/.exec(key)
   if (turnStep !== null) {
@@ -811,11 +816,7 @@ function anchorSeqOf(row: Element): number {
     const step = Number(turnStep[2])
     if (Number.isFinite(turn) && Number.isFinite(step)) return turn * 1000 + step
   }
-  const rows = document.querySelectorAll(`[data-chat-anchor-key], ${FLOW_ROW}`)
-  for (let i = 0; i < rows.length; i += 1) {
-    if (rows[i] === row) return i
-  }
-  return 0
+  return documentRowIndex(row)
 }
 
 /**
@@ -852,6 +853,109 @@ export function installDomFenceRenderer(
   let activeChatSession: SessionId | undefined
   let unsubscribeChat: (() => void) | undefined
   const sourceLanguages = createSourceLanguageResolver(ctx)
+  // The fallback identity uses document order. Keep topology separate from
+  // eligibility: a source update can change a language without adding DOM,
+  // and streaming body text must not rediscover every span in the transcript.
+  let documentFences: Map<Element, number> | undefined
+  let documentOrdinalsDirty = true
+  let settledFenceCount = 0
+  let documentRows: Map<Element, number> | undefined
+
+  function invalidateDocumentTopology(): void {
+    documentFences = undefined
+    documentOrdinalsDirty = true
+    documentRows = undefined
+  }
+
+  function documentFenceIndex(block: Element): number {
+    documentFences ??= new Map(findFenceCandidates().map(candidate => [candidate, 0]))
+    if (documentOrdinalsDirty) {
+      settledFenceCount = 0
+      for (const candidate of documentFences.keys()) {
+        const language = isSettled(candidate) ? resolveFenceLanguage(candidate, sourceLanguages.get) : null
+        const eligible = language === 'dsh-ui'
+          || (language === undefined && isGenericGenuiFence(candidate, rawOf(candidate)))
+        documentFences.set(candidate, eligible ? ++settledFenceCount : 0)
+      }
+      documentOrdinalsDirty = false
+    }
+    return documentFences.get(block) || settledFenceCount + 1
+  }
+
+  function documentRowIndex(row: Element): number {
+    documentRows ??= new Map(Array.from(document.querySelectorAll(`[data-chat-anchor-key], ${FLOW_ROW}`),
+      (element, index) => [element, index]))
+    return documentRows.get(row) ?? 0
+  }
+
+  /** Only host topology or eligibility changes invalidate fallback order.
+   * Plugin commits, syntax-highlighting spans and ordinary reader-word spans
+   * do not add host fences/rows. Unknown-class surfaces remain covered by pre. */
+  function invalidateDocumentMutation(record: MutationRecord): void {
+    if (documentFences === undefined && documentRows === undefined) return
+    const element = record.target instanceof Element ? record.target : record.target.parentElement
+    if (element === null) return
+    if (record.type === 'attributes') {
+      if (record.attributeName === 'data-streaming') documentOrdinalsDirty = true
+      else if (record.attributeName !== 'class' || documentFences?.has(element)
+        || element.matches(CODE_BLOCK_SELECTORS)
+        || (element.closest('pre') === null && element.querySelector('pre') !== null)) {
+        invalidateDocumentTopology()
+      }
+      return
+    }
+    if (record.type === 'childList') {
+      const topology = `${CODE_BLOCK_SELECTORS}, [data-code-block-content], pre, [data-chat-anchor-key], ${FLOW_ROW}`
+      for (const node of [...record.addedNodes, ...record.removedNodes]) {
+        if (!(node instanceof Element)) continue
+        // Removed nodes may already live under an excluded ancestor by the
+        // time this batch runs. Their old membership still invalidates order.
+        if (documentFences?.has(node) || [...node.querySelectorAll('pre, span')].some(child => {
+          for (let current: Element | null = child; current !== null && current !== node; current = current.parentElement) {
+            if (documentFences?.has(current)) return true
+          }
+          return false
+        })) {
+          invalidateDocumentTopology()
+          return
+        }
+        if (node.closest(IGNORED_MUTATION_SCOPE) !== null) continue
+        if (node.matches(topology) || node.querySelector(topology) !== null
+          || isTakeoverTagText(node) || [...node.querySelectorAll('span')].some(span => isTakeoverTagText(span))
+          || (node.closest('pre') === null && (normalizeFenceLanguage(node.textContent?.trim() ?? '') === 'dsh-ui'
+            || (node.childElementCount > 0 && infostringOf(node) === 'dsh-ui')))) {
+          invalidateDocumentTopology()
+          return
+        }
+      }
+    }
+    const pre = element.closest<HTMLElement>('pre')
+    if (pre !== null) {
+      const block = outermostSurfaceOf(pre) ?? surfaceOf(pre)
+      // Only the generic-language fallback derives eligibility from body text.
+      if (block !== null && resolveFenceLanguage(block, sourceLanguages.get) === undefined) documentOrdinalsDirty = true
+      return
+    }
+    if (element.tagName === 'SPAN') {
+      const known = documentFences?.has(element) === true
+      const eligible = isTakeoverTagText(element)
+      if (known !== eligible) invalidateDocumentTopology()
+      if (known || eligible) return
+    }
+    // An unknown-class surface was absent from the old candidate list until
+    // its leaf banner changed to dsh-ui. Cached ancestry alone cannot see it.
+    if (element.childElementCount === 0 && normalizeFenceLanguage(element.textContent?.trim() ?? '') === 'dsh-ui') {
+      invalidateDocumentTopology()
+      return
+    }
+    // A banner edit or a changed surface shape can change language/discovery.
+    for (let current: Element | null = element; current !== null; current = current.parentElement) {
+      if (documentFences?.has(current)) {
+        invalidateDocumentTopology()
+        return
+      }
+    }
+  }
   /** Nodes changed since the last sweep, awaiting discovery; the value says
    * whether the whole new subtree has to be scanned (structure or attribute
    * change) or only the code context around the node (text change). Discovery
@@ -906,6 +1010,7 @@ export function installDomFenceRenderer(
       unsubscribeChat = undefined
       activeChatSession = sessionId
       fullMaintenance = true
+      invalidateDocumentTopology()
     }
     if (sessionId !== undefined && unsubscribeChat === undefined) {
       unsubscribeChat = chatSourceOf(ctx, sessionId)?.subscribe(() => {
@@ -913,6 +1018,7 @@ export function installDomFenceRenderer(
         // on screen before its rows exist in the snapshot, and only the source
         // can name an unlabelled surface dsh-ui.
         sourceChanged = true
+        documentOrdinalsDirty = true
         schedule()
       })
     }
@@ -929,13 +1035,13 @@ export function installDomFenceRenderer(
       // per block so the degraded path is visible in the console.
       warnOnce(block, 'no [data-chat-anchor-key] ancestor for a dsh-ui fence (host render path without row anchor — e.g. Safari); using fallback identity dom:unknown:N')
     }
-    const fenceIndex = fenceIndexOf(ctx, row, block, sourceLanguages.get)
+    const fenceIndex = fenceIndexOf(row, block, sourceLanguages.get, documentFenceIndex)
     const anchorKey = row.getAttribute('data-chat-anchor-key') ?? 'unknown'
     const key = `dom:${anchorKey}:${fenceIndex}` as Key
     const sessionId = sessionIdForRender(preserveSessionIdentity)
     const context: GenuiFenceContext = {
       ...(sessionId === undefined ? {} : { sessionId }),
-      ...(settled ? { source: { id: key as string, order: [anchorSeqOf(row), 0, fenceIndex] as const } } : {}),
+      ...(settled ? { source: { id: key as string, order: [anchorSeqOf(row, documentRowIndex), 0, fenceIndex] as const } } : {}),
     }
     return { key, context }
   }
@@ -1394,6 +1500,7 @@ export function installDomFenceRenderer(
    * discovery queued — settled or still streaming. */
   function sweep(full = false): void {
     if (disposed) return
+    if (full) invalidateDocumentTopology()
     sourceLanguages.beginSweep()
     const sourceSession = sourceSessionOf(ctx)
     const sessionId = sourceSession.available ? sourceSession.sessionId : undefined
@@ -1587,8 +1694,12 @@ export function installDomFenceRenderer(
     // plugin commit must not turn an unrelated subtree into maintenance work.
     for (const record of records) {
       const element = record.target instanceof Element ? record.target : record.target.parentElement
+      // Membership-changing host attributes matter even after they put the
+      // target in an excluded subtree. Ignore our own React class commits.
+      if (record.type === 'attributes' && record.attributeName !== 'class') invalidateDocumentMutation(record)
       if (element !== null && element.closest(IGNORED_MUTATION_SCOPE) !== null) continue
       relevant = true
+      if (record.type !== 'attributes' || record.attributeName === 'class') invalidateDocumentMutation(record)
       markOwnedAncestors(record.target)
       if (record.type === 'characterData') {
         markDirty(record.target, false)
@@ -1611,7 +1722,7 @@ export function installDomFenceRenderer(
         }
         continue
       }
-      // data-streaming applies to all mounted descendants of its row.
+      // Host metadata applies to all mounted descendants of its row/surface.
       markOwnedSubtree(record.target)
       markDirty(record.target, true)
     }
@@ -1625,7 +1736,7 @@ export function installDomFenceRenderer(
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['data-streaming'],
+    attributeFilter: FENCE_ATTRIBUTES,
     // React streams tokens as text-node updates: without characterData the
     // observer would only fire on structural changes and miss body growth.
     characterData: true,
@@ -1645,7 +1756,9 @@ export function installDomFenceRenderer(
   // frames while the scrollback drains from the queue. It is one synchronous
   // pass by design — the budget below bounds discovery, not a single subtree
   // query, and a session switch must not leave raw spec on screen.
+  syncChatSubscription(sessionIdOf())
   const initial = findFenceCandidates()
+  documentFences = new Map(initial.map(candidate => [candidate, 0]))
   for (let index = initial.length - 1; index >= 0; index -= 1) enqueueCandidate(initial[index])
   sweep()
 
@@ -1665,6 +1778,7 @@ export function installDomFenceRenderer(
     dirtyDiagnostics.clear()
     pendingCandidates.clear()
     awaitingSource.clear()
+    invalidateDocumentTopology()
     for (const block of Array.from(mounts.keys())) unmountBlock(block)
     for (const block of Array.from(diagnostics.keys())) clearDiagnostic(block)
   }
