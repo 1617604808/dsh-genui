@@ -270,14 +270,16 @@ export const TableNode = memo(function TableNode({ node, renderDetail, filterVal
   const visibleRows = filtered.map(entry => entry.row)
   const hiddenCount = rows.length - visibleRows.length
 
-  interface Section { header: { row: GenuiTable['rows'][number]; index: number } | null; children: Array<{ row: GenuiTable['rows'][number]; index: number }> }
+  interface Section { header: { row: GenuiTable['rows'][number]; index: number } | null; children: Array<{ row: GenuiTable['rows'][number]; index: number; visibleIndex: number }> }
   const sections: Section[] = []
-  visibleRows.forEach((row, index) => {
+  // Details and local state belong to the original row, not its filtered
+  // position. Keep the latter separately for the displayed index column.
+  filtered.forEach(({ row, index }, visibleIndex) => {
     if (isGroupRow(row)) { sections.push({ header: { row, index }, children: [] }); return }
     if (sections.length === 0 || sections[sections.length - 1]!.header === null) {
       if (sections.length === 0) sections.push({ header: null, children: [] })
     }
-    sections[sections.length - 1]!.children.push({ row, index })
+    sections[sections.length - 1]!.children.push({ row, index, visibleIndex })
   })
 
   // Sorting keeps sections intact: each section's children sort among
@@ -443,7 +445,7 @@ export const TableNode = memo(function TableNode({ node, renderDetail, filterVal
                                 </span>
                               </td>
                             )
-                            : renderCell(cell, j, child.index)
+                            : renderCell(cell, j, child.visibleIndex)
                         ))}
                       </tr>
                       {open && detail !== null && (
