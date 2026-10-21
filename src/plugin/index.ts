@@ -92,7 +92,7 @@ const RENDER_UI_TOOL_GUIDANCE = '- Tool channel: render_ui 工具把同一 spec 
 export const GENUI_SECTION_TEXT = `Render UI inside your reply with a fenced \`dsh-ui\` JSON block:
 
 \`\`\`dsh-ui
-{"title":"<user-language text>","gap":14,"items":[...]}
+{"title":"示例","gap":14,"items":[{"type":"text","content":"把这里换成你的组件"}]}
 \`\`\`
 
 Allowed \`type\` values; the \`genui\` skill, when available, carries the full content→component mapping and per-component field details:

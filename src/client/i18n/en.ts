@@ -338,5 +338,5 @@ export const EN = {
   'err.fieldValidation': 'GenUI field validation failed: {errors}',
   'err.chartValidation': 'chart field validation failed: {errors}',
   'err.fenceKeptAsCode': '⚠️ dsh-ui {diagnostic} — the fence stays a code block; fix it and resend.',
-  'err.fenceParse': '⚠️ dsh-ui fence JSON failed to parse{diagnostic} — the fence stays a code block; ask the model to fix the JSON and resend.',
+  'err.fenceParse': '⚠️ dsh-ui fence JSON failed to parse {diagnostic} — the fence stays a code block; ask the model to fix the JSON and resend.',
 } as const
