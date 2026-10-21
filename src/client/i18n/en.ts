@@ -259,6 +259,9 @@ export const EN = {
   'ach.template-1.desc': 'Tried a template from the template center.',
 
   // ------------------------------------------------- primitive chrome
+  'label.copyViewText': 'View text',
+  'label.copyHideText': 'Hide text',
+  'label.copyPreviewTruncated': 'Preview truncated. Copy still includes the component’s full text.',
   'label.copy': 'Copy',
   /** CodeBlock's post-copy button label. */
   'label.copied': 'Copied',

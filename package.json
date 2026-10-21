@@ -35,6 +35,7 @@
     "lib/types/plugin/index.d.ts",
     "lib/types/client/index.d.ts",
     "SKILL.md",
+    "docs/copy-preview.md",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",
