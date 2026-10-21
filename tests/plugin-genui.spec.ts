@@ -321,7 +321,8 @@ describe('genui:fence section', () => {
 
     const genui = await ctx.plugin(GenUI)
 
-    expect(await ctx.skills.list()).toEqual(expect.arrayContaining([
+    const catalog = await ctx.skills.list()
+    expect(catalog).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'genui',
         provider: 'dsh-genui',
@@ -332,6 +333,9 @@ describe('genui:fence section', () => {
         },
       }),
     ]))
+    const summary = catalog.find(skill => skill.name === 'genui')
+    const frontmatter = readFileSync('SKILL.md', 'utf8').split('\n---\n')[0]
+    expect(frontmatter?.split('\n')).toContain(`description: ${JSON.stringify(summary?.description)}`)
 
     const skill = await ctx.skills.get('genui')
     expect(skill).toMatchObject({
@@ -339,6 +343,7 @@ describe('genui:fence section', () => {
       provider: 'dsh-genui',
       source: 'bundled',
     })
+    expect(skill?.description).toBe(summary?.description)
     expect(skill?.description).toContain('Preserve conversation language')
     expect(skill?.description).not.toMatch(/[\u3400-\u9fff]/u)
 
