@@ -43,6 +43,16 @@ export function safeMapError(error) {
     .replace(/([?&](?:token|key|secret|password)=)[^\s&#"']*/giu, '$1[redacted]')
     .slice(0, 2500)
 }
+/** Keep independent checks running without ever converting a failure to a pass. */
+export async function recordMapCheckFailure(failures, stage, check) {
+  try { await check(); return true } catch (error) {
+    failures.push({ stage, error: safeMapError(error) })
+    return false
+  }
+}
+export function assertMapChecksPassed(failures) {
+  if (failures.length) throw new Error('Map acceptance failed: ' + failures.map(failure => `${failure.stage}: ${failure.error}`).join('; '))
+}
 /** Analyze only the center screenshot crop, not same-blue endpoint markers. */
 export function measureRoutePixels({ data, width, height }) {
   if (width !== 80 || height !== 32 || data.length !== width * height * 4) throw new Error('Expected an 80x32 RGBA screenshot crop')

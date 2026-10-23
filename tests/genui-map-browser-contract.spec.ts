@@ -1,13 +1,16 @@
 /** Pure/script checks only. Passing this suite is NOT browser/WebGL acceptance. */
 import { afterEach, describe, expect, it } from 'vitest'
 import assert from 'node:assert/strict'
+import { within } from '@testing-library/dom'
+import { spawnSync } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import ts from 'typescript'
 import { parse } from 'yaml'
-import { assertOfflineMapArtifact, createMapSpec, mapBrowserLaunchOptions, measureRoutePixels, safeMapError, validateMapMode } from '../scripts/map-acceptance/contract.mjs'
-import { assertMapSubmission, prepareMapConversation, replayChunks } from '../scripts/e2e-map-host.mjs'
+import { assertMapChecksPassed, assertOfflineMapArtifact, createMapSpec, mapBrowserLaunchOptions, measureRoutePixels, recordMapCheckFailure, safeMapError, validateMapMode } from '../scripts/map-acceptance/contract.mjs'
+import { assertMapSubmission, mapConversationTitle, prepareMapConversation, replayChunks } from '../scripts/e2e-map-host.mjs'
 import { validateGenuiSpec } from '../src/client/guard.ts'
 
 const directories: string[] = []
@@ -17,6 +20,77 @@ function rgba(draw: (x: number, y: number) => number[]) {
 }
 const paper = [238, 242, 246], blue = [49, 95, 168]
 describe('Map real-browser acceptance contract (no browser launched)', () => {
+  it('selects the conversation navigation target, not an identical visible breadcrumb', () => {
+    const root = document.createElement('div')
+    root.innerHTML = '<nav aria-label="会话"><span>Map browser synthetic conversation</span></nav><nav aria-label="会话层级"><span>Map browser synthetic conversation</span></nav>'
+    const textTarget = (scope: HTMLElement, text: string, options: { exact: boolean }) => ({
+      and: (_visible: unknown) => within(scope).getAllByText(text, options),
+    })
+    const page = {
+      getByText: (text: string, options: { exact: boolean }) => textTarget(root, text, options),
+      getByLabel: (label: string, options: { exact: boolean }) => {
+        expect(options).toEqual({ exact: true })
+        const scope = within(root).getByLabelText(label, options)
+        return { getByText: (text: string, opts: { exact: boolean }) => textTarget(scope, text, opts) }
+      },
+      locator: (selector: string) => { expect(selector).toBe(':visible'); return 'visible' },
+    }
+    expect(within(root).getAllByText('Map browser synthetic conversation', { exact: true })).toHaveLength(2)
+    const matches = mapConversationTitle(page)
+    expect(matches).toHaveLength(1)
+    expect(matches[0].parentElement?.getAttribute('aria-label')).toBe('会话')
+  })
+  it('preserves independent failures and redacts them even after later cleanup succeeds', async () => {
+    const failures: { stage: string; error: string }[] = []
+    let workers = 1
+    expect(await recordMapCheckFailure(failures, 'embed-worker-cleanup', async () => assert.equal(workers, 0))).toBe(false)
+    expect(await recordMapCheckFailure(failures, 'offline-file', async () => { throw new Error('https://synthetic.invalid/?token=private-value') })).toBe(false)
+    workers = 0 // A later context close cannot erase the earlier failed verdict.
+    expect(await recordMapCheckFailure(failures, 'touch-embed', async () => assert.equal(workers, 0))).toBe(true)
+    expect(failures.map(failure => failure.stage)).toEqual(['embed-worker-cleanup', 'offline-file'])
+    expect(failures[1]!.error).toContain('token=[redacted]')
+    expect(JSON.stringify(failures)).not.toContain('private-value')
+    expect(() => assertMapChecksPassed(failures)).toThrow('embed-worker-cleanup')
+  })
+  it('exits nonzero after executing later independent checks when cleanup failed', () => {
+    const module = pathToFileURL(resolve('scripts/map-acceptance/contract.mjs')).href
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { recordMapCheckFailure, assertMapChecksPassed } from ${JSON.stringify(module)};
+      const failures = [];
+      await recordMapCheckFailure(failures, 'embed-worker-cleanup', async () => { throw new Error('Workers remain ?token=private-value'); });
+      for (const stage of ['offline-file', 'touch-embed', 'blocked-worker-fallback']) {
+        await recordMapCheckFailure(failures, stage, async () => console.log(stage));
+      }
+      assertMapChecksPassed(failures);
+      console.log('must-not-report-passed');
+    `], { encoding: 'utf8', timeout: 10000 })
+    expect(result.status).toBe(1)
+    expect(result.stdout.trim().split('\n')).toEqual(['offline-file', 'touch-embed', 'blocked-worker-fallback'])
+    expect(result.stderr).toContain('embed-worker-cleanup')
+    expect(result.stderr).not.toContain('private-value')
+    expect(result.stdout).not.toContain('must-not-report-passed')
+  })
+  it('only permits aggregate success when every independent check passes', async () => {
+    const failures: { stage: string; error: string }[] = []
+    expect(await recordMapCheckFailure(failures, 'synthetic-success', async () => {})).toBe(true)
+    expect(() => assertMapChecksPassed(failures)).not.toThrow()
+    expect(failures).toEqual([])
+  })
+  it('snapshots last-unmount evidence before context teardown and gates the final pass', async () => {
+    const runner = await readFile('scripts/map-acceptance/run.mjs', 'utf8')
+    const cleanup = runner.indexOf("independentCheck('embed-worker-cleanup'")
+    const snapshot = runner.indexOf('workerClosesBeforeContextCleanup:')
+    const verdict = runner.indexOf('embedEvidence.workerCleanup.passed = workerCleanupPassed')
+    const teardown = runner.indexOf('await context.close()')
+    expect(cleanup).toBeGreaterThan(0)
+    expect(snapshot).toBeGreaterThan(cleanup)
+    expect(verdict).toBeGreaterThan(snapshot)
+    expect(teardown).toBeGreaterThan(verdict)
+    expect(runner).toContain("await until(() => embed.workers().length === 0, 'Workers stop after last Map unmount')")
+    expect(runner).toContain("assert.ok(embedEvidence.workerUrlsRevoked.length > 0 && embedEvidence.workerUrlsRevoked.every(Boolean), 'Worker blob URLs revoked after termination')")
+    for (const stage of ['offline-file', 'touch-embed', 'blocked-worker-fallback']) expect(runner).toContain(`await independentCheck('${stage}', async () => {`)
+    expect(runner.indexOf('assertMapChecksPassed(report.failures)')).toBeLessThan(runner.indexOf('report.passed = true'))
+  })
   it.each([undefined, '/synthetic/official-chrome'])('keeps command-line audit available with sandboxed Chrome (%s)', executablePath => {
     const options = mapBrowserLaunchOptions(executablePath)
     expect(options).toEqual({ ...(executablePath ? { executablePath } : { channel: 'chrome' }),

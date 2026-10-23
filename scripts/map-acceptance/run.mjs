@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createServer } from 'vite'
-import { createMapSpec, MAP_TITLE, MAP_ACTION, MAP_SUBMIT, safeMapError, assertOfflineMapArtifact } from './contract.mjs'
+import { createMapSpec, MAP_TITLE, MAP_ACTION, MAP_SUBMIT, safeMapError, assertOfflineMapArtifact, recordMapCheckFailure, assertMapChecksPassed } from './contract.mjs'
 import { checkMapUi, controls, mapSection, listChoice, marker, until, watchMapPage, installCspObserver, assertRoutePixels } from './browser-checks.mjs'
 
 const noErrors = evidence => {
@@ -22,9 +22,18 @@ export async function runMapAcceptance({ browser, page, readyUrl, repoRoot, tarb
   const report = { passed: false, stage: 'host', identity: { revision: process.env.GITHUB_SHA ?? null,
     hostSha: process.env.HOST_SHA ?? null, browser: browser.version() },
   browserPolicy: { sandboxRequested: true, softwareGpu: 'ANGLE SwiftShader OpenGL ES driver', unsafeFallback: false },
-  hostAction: conversation ? 'pending' : 'not-covered-minimum-rc.1', contexts: {} }
+  hostAction: conversation ? 'pending' : 'not-covered-minimum-rc.1', contexts: {}, failures: [] }
   let server, packed, active = page
   const ownedContexts = []
+  const independentCheck = async (stage, check) => {
+    report.stage = stage
+    const passed = await recordMapCheckFailure(report.failures, stage, check)
+    if (!passed) {
+      try { await active.screenshot({ path: join(out, `map-${stage}-failure.png`) }) }
+      catch (error) { report.failures.at(-1).screenshotError = safeMapError(error) }
+    }
+    return passed
+  }
   page.setDefaultTimeout(10000)
   const hostEvidence = watchMapPage(page, [new URL(readyUrl).origin])
   report.contexts.host = hostEvidence
@@ -162,90 +171,107 @@ export async function runMapAcceptance({ browser, page, readyUrl, repoRoot, tarb
     await until(async () => JSON.parse(await embed.locator('#map-actions').textContent()).length === 1, 'One explicit embed action')
     assert.deepEqual(JSON.parse(await embed.locator('#map-actions').textContent()), [{ action: MAP_ACTION,
       payload: { type: 'submit', answers: {}, fields: { destination: 'east' }, total: 1, answered: 1 } }])
-    const workerUrls = embed.workers().map(worker => worker.url())
-    await embed.getByRole('button', { name: 'Unmount map', exact: true }).click()
-    await until(() => embed.workers().length === 0, 'Workers stop after last Map unmount')
-    assert.ok(embedEvidence.workerCloses >= 1)
-    embedEvidence.workerUrlsRevoked = await embed.evaluate(async urls => Promise.all(urls.map(async url => {
-      try { await fetch(url); return false } catch { return true }
-    })), workerUrls)
-    assert.ok(embedEvidence.workerUrlsRevoked.length > 0 && embedEvidence.workerUrlsRevoked.every(Boolean), 'Worker blob URLs revoked after termination')
-    embedEvidence.csp = await embed.evaluate(() => window.__mapCspViolations)
-    assert.deepEqual(embedEvidence.csp, [])
-    noErrors(embedEvidence)
+    const workerCleanupPassed = await independentCheck('embed-worker-cleanup', async () => {
+      try {
+        const workerUrls = embed.workers().map(worker => worker.url())
+        await embed.getByRole('button', { name: 'Unmount map', exact: true }).click()
+        await until(() => embed.workers().length === 0, 'Workers stop after last Map unmount')
+        assert.ok(embedEvidence.workerCloses >= 1)
+        embedEvidence.workerUrlsRevoked = await embed.evaluate(async urls => Promise.all(urls.map(async url => {
+          try { await fetch(url); return false } catch { return true }
+        })), workerUrls)
+        assert.ok(embedEvidence.workerUrlsRevoked.length > 0 && embedEvidence.workerUrlsRevoked.every(Boolean), 'Worker blob URLs revoked after termination')
+        embedEvidence.csp = await embed.evaluate(() => window.__mapCspViolations)
+        assert.deepEqual(embedEvidence.csp, [])
+        noErrors(embedEvidence)
+      } finally {
+        // Sample at the check boundary, before screenshots or context.close().
+        // Later teardown events cannot repair this verdict or these counts.
+        embedEvidence.workerCleanup = { workersRemaining: embed.workers().length,
+          workerClosesBeforeContextCleanup: embedEvidence.workerCloses }
+      }
+    })
+    embedEvidence.workerCleanup.passed = workerCleanupPassed
 
-    report.stage = 'offline-file'
-    // This file navigation happens ONLY on CI, not through any local/cloud CUA
-    // route. New offline context before its FIRST navigation, original CSP.
-    const offlineContext = await browser.newContext({ viewport: { width: 1000, height: 1100 }, locale: 'en', offline: true })
-    ownedContexts.push(offlineContext)
-    const offline = await offlineContext.newPage(); offline.setDefaultTimeout(10000); active = offline
-    const offlineEvidence = watchMapPage(offline, [], { allowFile: true }); report.contexts.offline = offlineEvidence
-    await installCspObserver(offline)
-    await offline.goto(pathToFileURL(offlinePath).href, { waitUntil: 'load' })
-    await assertSelection(mapSection(offline))
-    offlineEvidence.checks = await checkMapUi({ page: offline, root: offline, out, prefix: 'map-offline' })
-    assert.equal(await offline.getByRole('button', { name: MAP_SUBMIT, exact: true }).isEnabled(), false, 'Offline actions cannot call a model')
-    offlineEvidence.csp = await offline.evaluate(() => window.__mapCspViolations)
-    offlineEvidence.modelSubmitDisabled = true
-    await offline.reload({ waitUntil: 'load' })
-    await assertSelection(mapSection(offline))
-    await until(() => mapSection(offline).getByRole('button', { name: controls.reset }).isEnabled(), 'Independent offline reload')
-    await mapSection(offline).getByRole('button', { name: controls.reset }).click()
-    offlineEvidence.reloadRoute = await assertRoutePixels(offline, mapSection(offline), join(out, 'map-offline-reloaded-route.png'))
-    assert.ok(offlineEvidence.workerUrls.includes('blob:'))
-    offlineEvidence.csp.push(...await offline.evaluate(() => window.__mapCspViolations))
-    assert.deepEqual(offlineEvidence.csp, [])
-    assert.deepEqual(offlineEvidence.requests, [], 'Offline HTML must make zero network requests')
-    assert.deepEqual(offlineEvidence.webSockets, [], 'Offline HTML must make zero WebSocket connections')
-    noErrors(offlineEvidence)
+    await independentCheck('offline-file', async () => {
+      // This file navigation happens ONLY on CI, not through any local/cloud CUA
+      // route. New offline context before its FIRST navigation, original CSP.
+      const offlineContext = await browser.newContext({ viewport: { width: 1000, height: 1100 }, locale: 'en', offline: true })
+      ownedContexts.push(offlineContext)
+      const offline = await offlineContext.newPage(); offline.setDefaultTimeout(10000); active = offline
+      const offlineEvidence = watchMapPage(offline, [], { allowFile: true }); report.contexts.offline = offlineEvidence
+      await installCspObserver(offline)
+      await offline.goto(pathToFileURL(offlinePath).href, { waitUntil: 'load' })
+      await assertSelection(mapSection(offline))
+      offlineEvidence.checks = await checkMapUi({ page: offline, root: offline, out, prefix: 'map-offline' })
+      assert.equal(await offline.getByRole('button', { name: MAP_SUBMIT, exact: true }).isEnabled(), false, 'Offline actions cannot call a model')
+      offlineEvidence.csp = await offline.evaluate(() => window.__mapCspViolations)
+      offlineEvidence.modelSubmitDisabled = true
+      await offline.reload({ waitUntil: 'load' })
+      await assertSelection(mapSection(offline))
+      await until(() => mapSection(offline).getByRole('button', { name: controls.reset }).isEnabled(), 'Independent offline reload')
+      await mapSection(offline).getByRole('button', { name: controls.reset }).click()
+      offlineEvidence.reloadRoute = await assertRoutePixels(offline, mapSection(offline), join(out, 'map-offline-reloaded-route.png'))
+      assert.ok(offlineEvidence.workerUrls.includes('blob:'))
+      offlineEvidence.csp.push(...await offline.evaluate(() => window.__mapCspViolations))
+      assert.deepEqual(offlineEvidence.csp, [])
+      assert.deepEqual(offlineEvidence.requests, [], 'Offline HTML must make zero network requests')
+      assert.deepEqual(offlineEvidence.webSockets, [], 'Offline HTML must make zero WebSocket connections')
+      noErrors(offlineEvidence)
+    })
 
-    report.stage = 'touch-embed'
-    const touchContext = await browser.newContext({ viewport: { width: 390, height: 1000 }, locale: 'en', hasTouch: true, isMobile: true })
-    ownedContexts.push(touchContext)
-    const touch = await touchContext.newPage(); touch.setDefaultTimeout(10000); active = touch
-    const touchEvidence = watchMapPage(touch, [origin]); report.contexts.touch = touchEvidence
-    await installCspObserver(touch)
-    await touch.goto(`${origin}/tests/browser/map.html`, { waitUntil: 'networkidle' })
-    await touch.getByRole('button', { name: 'Mount map', exact: true }).tap()
-    const touchMap = mapSection(touch)
-    await until(() => touchMap.getByRole('button', { name: controls.reset }).isEnabled(), 'Touch Map ready')
-    await listChoice(touchMap, 'Synthetic East').tap()
-    await assertSelection(touchMap)
-    // Selection recenters the camera. Refit before targeting the opposite
-    // endpoint in a 390px viewport, where it would otherwise be clipped.
-    await touchMap.getByRole('button', { name: controls.reset }).tap()
-    await marker(touchMap, 'Synthetic West').tap()
-    await until(async () => await listChoice(touchMap, 'Synthetic West').getAttribute('aria-pressed') === 'true', 'Touch marker → list')
-    assert.deepEqual(JSON.parse(await touch.locator('#map-actions').textContent()), [])
-    await touchMap.getByRole('button', { name: controls.reset }).tap()
-    touchEvidence.route = await assertRoutePixels(touch, touchMap, join(out, 'map-touch-route.png'))
-    await touchMap.screenshot({ path: join(out, 'map-touch-selected.png') })
-    touchEvidence.csp = await touch.evaluate(() => window.__mapCspViolations)
-    assert.deepEqual(touchEvidence.csp, [])
-    noErrors(touchEvidence)
+    await independentCheck('touch-embed', async () => {
+      const touchContext = await browser.newContext({ viewport: { width: 390, height: 1000 }, locale: 'en', hasTouch: true, isMobile: true })
+      ownedContexts.push(touchContext)
+      const touch = await touchContext.newPage(); touch.setDefaultTimeout(10000); active = touch
+      const touchEvidence = watchMapPage(touch, [origin]); report.contexts.touch = touchEvidence
+      await installCspObserver(touch)
+      await touch.goto(`${origin}/tests/browser/map.html`, { waitUntil: 'networkidle' })
+      await touch.getByRole('button', { name: 'Mount map', exact: true }).tap()
+      const touchMap = mapSection(touch)
+      await until(() => touchMap.getByRole('button', { name: controls.reset }).isEnabled(), 'Touch Map ready')
+      await listChoice(touchMap, 'Synthetic East').tap()
+      await assertSelection(touchMap)
+      // Selection recenters the camera. Refit before targeting the opposite
+      // endpoint in a 390px viewport, where it would otherwise be clipped.
+      await touchMap.getByRole('button', { name: controls.reset }).tap()
+      await marker(touchMap, 'Synthetic West').tap()
+      await until(async () => await listChoice(touchMap, 'Synthetic West').getAttribute('aria-pressed') === 'true', 'Touch marker → list')
+      assert.deepEqual(JSON.parse(await touch.locator('#map-actions').textContent()), [])
+      await touchMap.getByRole('button', { name: controls.reset }).tap()
+      touchEvidence.route = await assertRoutePixels(touch, touchMap, join(out, 'map-touch-route.png'))
+      await touchMap.screenshot({ path: join(out, 'map-touch-selected.png') })
+      touchEvidence.csp = await touch.evaluate(() => window.__mapCspViolations)
+      assert.deepEqual(touchEvidence.csp, [])
+      noErrors(touchEvidence)
+    })
 
-    report.stage = 'blocked-worker-fallback'
-    const failureContext = await browser.newContext({ viewport: { width: 1000, height: 1100 }, locale: 'en' })
-    ownedContexts.push(failureContext)
-    const failure = await failureContext.newPage(); failure.setDefaultTimeout(10000); active = failure
-    const failureEvidence = watchMapPage(failure, [origin]); report.contexts.blockedWorker = failureEvidence
-    await installCspObserver(failure)
-    await failure.goto(`${origin}/tests/browser/map.html?block-worker=1`, { waitUntil: 'networkidle' })
-    await failure.getByRole('button', { name: 'Mount map', exact: true }).click()
-    const failedMap = mapSection(failure)
-    await failedMap.getByRole('status').filter({ hasText: 'Map unavailable' }).waitFor({ state: 'visible' })
-    await listChoice(failedMap, 'Synthetic East').focus(); await failure.keyboard.press('Enter')
-    assert.equal(await listChoice(failedMap, 'Synthetic East').getAttribute('aria-pressed'), 'true')
-    assert.equal(await failedMap.getByRole('button', { name: controls.reset }).isEnabled(), false)
-    assert.deepEqual(JSON.parse(await failure.locator('#map-actions').textContent()), [])
-    await failure.getByRole('button', { name: MAP_SUBMIT, exact: true }).click()
-    await until(async () => JSON.parse(await failure.locator('#map-actions').textContent()).length === 1, 'List fallback explicit submit')
-    failureEvidence.csp = await failure.evaluate(() => window.__mapCspViolations)
-    assert.ok(failureEvidence.csp.length > 0 && failureEvidence.csp.every(event => event.directive === 'worker-src'), 'Only the deliberately blocked worker may violate CSP')
-    noErrors(failureEvidence)
-    await failedMap.screenshot({ path: join(out, 'map-blocked-worker-list.png') })
-    report.stage = 'complete'; report.passed = true
+    await independentCheck('blocked-worker-fallback', async () => {
+      const failureContext = await browser.newContext({ viewport: { width: 1000, height: 1100 }, locale: 'en' })
+      ownedContexts.push(failureContext)
+      const failure = await failureContext.newPage(); failure.setDefaultTimeout(10000); active = failure
+      const failureEvidence = watchMapPage(failure, [origin]); report.contexts.blockedWorker = failureEvidence
+      await installCspObserver(failure)
+      await failure.goto(`${origin}/tests/browser/map.html?block-worker=1`, { waitUntil: 'networkidle' })
+      await failure.getByRole('button', { name: 'Mount map', exact: true }).click()
+      const failedMap = mapSection(failure)
+      await failedMap.getByRole('status').filter({ hasText: 'Map unavailable' }).waitFor({ state: 'visible' })
+      await listChoice(failedMap, 'Synthetic East').focus(); await failure.keyboard.press('Enter')
+      assert.equal(await listChoice(failedMap, 'Synthetic East').getAttribute('aria-pressed'), 'true')
+      assert.equal(await failedMap.getByRole('button', { name: controls.reset }).isEnabled(), false)
+      assert.deepEqual(JSON.parse(await failure.locator('#map-actions').textContent()), [])
+      await failure.getByRole('button', { name: MAP_SUBMIT, exact: true }).click()
+      await until(async () => JSON.parse(await failure.locator('#map-actions').textContent()).length === 1, 'List fallback explicit submit')
+      failureEvidence.csp = await failure.evaluate(() => window.__mapCspViolations)
+      assert.ok(failureEvidence.csp.length > 0 && failureEvidence.csp.every(event => event.directive === 'worker-src'), 'Only the deliberately blocked worker may violate CSP')
+      noErrors(failureEvidence)
+      await failedMap.screenshot({ path: join(out, 'map-blocked-worker-list.png') })
+    })
+
+    report.stage = 'aggregate'
+    assertMapChecksPassed(report.failures)
+    report.stage = 'complete'
+    report.passed = true
   } catch (error) {
     report.error = safeMapError(error)
     try { await active.screenshot({ path: join(out, 'map-failure.png') }) } catch (failure) { report.screenshotError = safeMapError(failure) }

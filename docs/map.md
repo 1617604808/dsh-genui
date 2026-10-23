@@ -74,8 +74,12 @@ route and unchanged standalone policy to work without external worker imports.
 The ~1.3 MB engine, vendor CSS, and inert worker source live in the independent
 `lib/assets/maplibre.js` IIFE, not the eager client/standalone runtime. The engine
 is requested only when a map mounts, not by idle prefetch. CSS is injected then;
-a Blob worker URL is created at first mount. The final map removes its workers
-before that URL is revoked. No host route or security policy is relaxed.
+a Blob worker URL is created at first mount. The final unmount calls `Map.remove()`
+and revokes the owned URL. **Known release blocker:** MapLibre 5.6.2 retains an
+RTL global dispatcher and its worker after the last map is removed. The real
+browser cleanup check still requires termination and fails; this is not complete
+resource cleanup. No private worker-pool mutation or security-policy relaxation
+is used to hide that failure.
 
 Bundler hosts should copy the **built** `@changfenhuang/dsh-genui/assets/maplibre`
 IIFE alongside the other assets and call `setGenuiAssetBase` with that directory.

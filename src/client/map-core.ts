@@ -9,7 +9,9 @@ import { maplibreCss, maplibreWorker } from './maplibre-resources.ts'
 const ROUTES = '__genui_routes'
 let workerUrl: string | undefined
 let users = 0
-/** MapLibre shares a worker pool, terminating it when its final map is removed. */
+/** Own this bundle's worker URL. MapLibre 5.6.2 retains an RTL global dispatcher,
+ * so Map.remove() alone does not guarantee worker termination: acceptance blocker.
+ */
 function acquireWorker(): () => void {
   if (workerUrl === undefined) {
     workerUrl = URL.createObjectURL(new Blob([maplibreWorker], { type: 'text/javascript' }))

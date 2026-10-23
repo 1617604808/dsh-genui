@@ -12,6 +12,12 @@ const ACK = 'Synthetic map selection received.'
 const INITIAL = 'Display the synthetic map fixture.'
 const TITLE = 'Map browser synthetic conversation'
 
+export function mapConversationTitle(page) {
+  // The active conversation also appears in the breadcrumb. Target the
+  // session navigation region, retaining strict uniqueness within that region.
+  return page.getByLabel('会话', { exact: true }).getByText(TITLE, { exact: true }).and(page.locator(':visible'))
+}
+
 export function assertMapSubmission(text) {
   assert.ok(text.startsWith('[genui-action] map-confirm。'))
   const payload = JSON.parse(text.split(' 组件数据: ')[1])
@@ -101,7 +107,7 @@ export async function prepareMapConversation({ dshRoot, dshHome, spec }) {
     const workspaceRow = page.locator(`[data-row-key="workspace:${workspaceId}"]`)
     await workspaceRow.waitFor({ state: 'visible', timeout: 15000 })
     if (await workspaceRow.getAttribute('aria-expanded', { timeout: 15000 }) === 'false') await workspaceRow.click({ timeout: 15000 })
-    const title = page.getByText(TITLE, { exact: true }).and(page.locator(':visible'))
+    const title = mapConversationTitle(page)
     await title.waitFor({ state: 'visible', timeout: 15000 })
     assert.equal(await title.count(), 1, 'Created session title must have one visible UI target')
     await title.click({ timeout: 15000 })
