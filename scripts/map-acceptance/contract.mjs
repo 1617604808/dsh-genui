@@ -18,6 +18,11 @@ export function mapBrowserLaunchOptions(executablePath) {
   return {
     ...(executablePath ? { executablePath } : { channel: 'chrome' }),
     headless: true, chromiumSandbox: true,
+    // Pinned host Playwright 1.61.1 adds this unsafe fallback by default.
+    // Remove only that exact default; retain all other defaults and the live
+    // forbidden-flag audit. Never use ignoreDefaultArgs: true.
+    // https://github.com/microsoft/playwright/blob/v1.61.1/packages/playwright-core/src/server/chromium/chromium.ts
+    ignoreDefaultArgs: ['--enable-unsafe-swiftshader'],
     // Chromium's supported OpenGL ES driver on GPU-less bots, NOT the unsafe
     // WebGL fallback. Keep both renderer/GPU sandboxes and WebGL enabled.
     // https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/swiftshader.md

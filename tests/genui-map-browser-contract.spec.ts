@@ -1,5 +1,6 @@
 /** Pure/script checks only. Passing this suite is NOT browser/WebGL acceptance. */
 import { afterEach, describe, expect, it } from 'vitest'
+import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -19,8 +20,24 @@ describe('Map real-browser acceptance contract (no browser launched)', () => {
   it.each([undefined, '/synthetic/official-chrome'])('keeps command-line audit available with sandboxed Chrome (%s)', executablePath => {
     const options = mapBrowserLaunchOptions(executablePath)
     expect(options).toEqual({ ...(executablePath ? { executablePath } : { channel: 'chrome' }),
+      ignoreDefaultArgs: ['--enable-unsafe-swiftshader'],
       headless: true, chromiumSandbox: true, args: ['--enable-automation', '--use-gl=angle', '--use-angle=swiftshader'] })
-    expect(JSON.stringify(options)).not.toMatch(/no-sandbox|disable-gpu|unsafe|bypassCSP/)
+    expect(JSON.stringify(options.args)).not.toMatch(/no-sandbox|disable-gpu|unsafe|bypassCSP/)
+  })
+  it('keeps the actual running-browser audit rejecting every forbidden flag and valued variant', async () => {
+    const runner = await readFile('scripts/map-acceptance/run.mjs', 'utf8')
+    // Execute the unchanged production assertion, not a duplicated predicate.
+    // Fail closed if its source shape changes; no browser or command is run.
+    const audit = runner.match(/      const forbidden = \[[^\n]+\]\n      assert\.ok\([^\n]+\)/u)?.[0]
+    expect(audit).toBeDefined()
+    const check = new Function('assert', 'command', audit!)
+    const safe = mapBrowserLaunchOptions().args
+    expect(() => check(assert, { arguments: safe })).not.toThrow()
+    for (const flag of ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu-sandbox', '--disable-web-security', '--disable-gpu', '--enable-unsafe-swiftshader']) {
+      for (const suffix of ['', '=true', '=false']) {
+        expect(() => check(assert, { arguments: [...safe, flag + suffix] })).toThrow('Running Chrome must not disable sandboxes/WebGL or enable unsafe fallback')
+      }
+    }
   })
   it('refuses local, root, non-smoke, sidechat and unverified installs before browser/port work', () => {
     const valid = { map: true, smoke: true, sidechat: false, install: 'tarball', env: { GITHUB_ACTIONS: 'true', RUNNER_OS: 'Linux' }, uid: 1001 }
