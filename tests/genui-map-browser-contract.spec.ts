@@ -16,9 +16,10 @@ function rgba(draw: (x: number, y: number) => number[]) {
 }
 const paper = [238, 242, 246], blue = [49, 95, 168]
 describe('Map real-browser acceptance contract (no browser launched)', () => {
-  it('uses sandboxed Chrome and supported ES-driver software GPU, never unsafe fallback', () => {
-    const options = mapBrowserLaunchOptions()
-    expect(options).toEqual({ channel: 'chrome', headless: true, chromiumSandbox: true, args: ['--use-gl=angle', '--use-angle=swiftshader'] })
+  it.each([undefined, '/synthetic/official-chrome'])('keeps command-line audit available with sandboxed Chrome (%s)', executablePath => {
+    const options = mapBrowserLaunchOptions(executablePath)
+    expect(options).toEqual({ ...(executablePath ? { executablePath } : { channel: 'chrome' }),
+      headless: true, chromiumSandbox: true, args: ['--enable-automation', '--use-gl=angle', '--use-angle=swiftshader'] })
     expect(JSON.stringify(options)).not.toMatch(/no-sandbox|disable-gpu|unsafe|bypassCSP/)
   })
   it('refuses local, root, non-smoke, sidechat and unverified installs before browser/port work', () => {

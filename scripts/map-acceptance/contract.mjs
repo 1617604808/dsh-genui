@@ -21,7 +21,10 @@ export function mapBrowserLaunchOptions(executablePath) {
     // Chromium's supported OpenGL ES driver on GPU-less bots, NOT the unsafe
     // WebGL fallback. Keep both renderer/GPU sandboxes and WebGL enabled.
     // https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/swiftshader.md
-    args: ['--use-gl=angle', '--use-angle=swiftshader'],
+    // CDP Browser.getBrowserCommandLine requires this ordinary automation
+    // marker explicitly; do not rely on the host Playwright's default flags.
+    // https://chromedevtools.github.io/devtools-protocol/tot/Browser/#method-getBrowserCommandLine
+    args: ['--enable-automation', '--use-gl=angle', '--use-angle=swiftshader'],
   }
 }
 export function validateMapMode({ map, smoke, sidechat, install, env, uid }) {
