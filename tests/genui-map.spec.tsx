@@ -126,3 +126,38 @@ it('discards a stale engine load after trusted configuration replacement', async
   await act(async () => resolveFirst({ mountMap: mocks.mount }))
   expect(mocks.mount).toHaveBeenCalledOnce()
 })
+
+
+it('keeps asynchronous worker failure sticky while list selection and explicit submission remain usable', async () => {
+  mocks.mount.mockImplementation(() => ({ update: mocks.update, select: mocks.select, destroy: mocks.destroy, reset: mocks.reset, zoom: mocks.zoom, resize: mocks.resize }))
+  const onAction = vi.fn()
+  render(<GenuiActionContext.Provider value={onAction}><GenuiBlock spec={spec} /></GenuiActionContext.Provider>)
+  await waitFor(() => expect(mocks.mount).toHaveBeenCalledOnce())
+  const options = mocks.mount.mock.calls[0]![3] as MapMountOptions
+  act(() => { options.onError(); options.onReady() })
+  expect(screen.getByText(/Map unavailable/)).toBeTruthy()
+  expect((button('Reset view') as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(button('Beta'))
+  expect(button('Beta').getAttribute('aria-pressed')).toBe('true')
+  expect(onAction).not.toHaveBeenCalled()
+  fireEvent.click(button('Confirm'))
+  expect(onAction).toHaveBeenCalledExactlyOnceWith('choose', { type: 'submit', answers: {}, fields: { place: 'b' }, total: 1, answered: 1 })
+})
+
+
+it('retains the usable selection when a known blocked worker also rejects a configuration remount', async () => {
+  mocks.mount.mockImplementationOnce((_container, _node, _selected, options) => {
+    options.onError()
+    return { update: mocks.update, select: mocks.select, destroy: mocks.destroy, reset: mocks.reset, zoom: mocks.zoom, resize: mocks.resize }
+  }).mockImplementation(() => { throw new Error('Map worker blocked by document policy') })
+  const style = { version: 8 as const, sources: {}, layers: [] }
+  const view = render(<GenuiMapContext.Provider value={{ style }}><GenuiBlock spec={spec} /></GenuiMapContext.Provider>)
+  await screen.findByText(/Map unavailable/)
+  fireEvent.click(button('Beta'))
+  view.rerender(<GenuiMapContext.Provider value={{ style: { ...style } }}><GenuiBlock spec={spec} /></GenuiMapContext.Provider>)
+  await waitFor(() => expect(mocks.mount).toHaveBeenCalledTimes(2))
+  await screen.findByText(/Map unavailable/)
+  expect(button('Beta').getAttribute('aria-pressed')).toBe('true')
+  expect((button('Reset view') as HTMLButtonElement).disabled).toBe(true)
+  expect(mocks.destroy).toHaveBeenCalledOnce()
+})

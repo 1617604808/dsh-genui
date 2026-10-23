@@ -1,13 +1,13 @@
 // Mocked MapLibre contract and resource lifecycle, not real WebGL acceptance.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const fake = vi.hoisted(() => ({ maps: [] as any[], markers: [] as any[], setWorkerUrl: vi.fn(), constructorFailure: false, resetFailure: false }))
+const fake = vi.hoisted(() => ({ maps: [] as any[], markers: [] as any[], setWorkerUrl: vi.fn(), constructorFailure: false, resetFailure: false, duringConstructor: undefined as (() => void) | undefined }))
 vi.mock('../src/client/maplibre-resources.ts', () => ({ maplibreCss: '.maplibre-test{}', maplibreWorker: 'self.onmessage = () => {}' }))
 vi.mock('maplibre-gl/dist/maplibre-gl-csp.js', () => ({
   setWorkerUrl: fake.setWorkerUrl,
   Map: class {
     options: any; events = new Map<string, () => void>(); sources = new Map<string, any>(); loaded = false
     remove = vi.fn(); easeTo = vi.fn(); jumpTo = vi.fn(); fitBounds = vi.fn(); zoomTo = vi.fn(); resize = vi.fn(); addLayer = vi.fn()
-    constructor(options: any) { if (fake.constructorFailure) throw new Error('WebGL unavailable'); this.options = options; fake.maps.push(this); if (fake.resetFailure) this.fitBounds.mockImplementationOnce(() => { throw new Error('reset failed') }) }
+    constructor(options: any) { fake.duringConstructor?.(); if (fake.constructorFailure) throw new Error('WebGL unavailable'); this.options = options; fake.maps.push(this); if (fake.resetFailure) this.fitBounds.mockImplementationOnce(() => { throw new Error('reset failed') }) }
     on(event: string, callback: () => void) { this.events.set(event, callback) }
     off(event: string, callback: () => void) { if (this.events.get(event) === callback) this.events.delete(event) }
     isStyleLoaded() { return this.loaded }
@@ -20,16 +20,20 @@ vi.mock('maplibre-gl/dist/maplibre-gl-csp.js', () => ({
     constructor(options: any) { this.options = options; fake.markers.push(this) }
   },
 }))
-import { mountMap, offlineMapStyle, unwrapRoute } from '../src/client/map-core.ts'
+let mountMap: typeof import('../src/client/map-core.ts').mountMap
+let offlineMapStyle: typeof import('../src/client/map-core.ts').offlineMapStyle
+let unwrapRoute: typeof import('../src/client/map-core.ts').unwrapRoute
 import type { GenuiMap } from '../src/client/spec.ts'
 const node: GenuiMap = { type: 'map', locations: [{ id: 'a', label: '<script>attack</script>', coordinates: [179, 10] }, { id: 'b', label: 'B', coordinates: [-179, 20] }], routes: [{ id: 'route', label: 'Route', coordinates: [[179, 10], [-179, 20]] }] }
 const options = () => ({ onSelect: vi.fn(), onError: vi.fn(), onReady: vi.fn(), markerLabel: (s: string) => s })
 const destroy: Array<() => void> = []
-beforeEach(() => {
-  fake.maps.length = 0; fake.markers.length = 0; fake.constructorFailure = false; fake.resetFailure = false; vi.clearAllMocks()
+beforeEach(async () => {
+  vi.resetModules()
+  ;({ mountMap, offlineMapStyle, unwrapRoute } = await import('../src/client/map-core.ts'))
+  fake.maps.length = 0; fake.markers.length = 0; fake.constructorFailure = false; fake.resetFailure = false; fake.duringConstructor = undefined; vi.clearAllMocks()
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:map-worker'), revokeObjectURL: vi.fn() }))
 })
-afterEach(() => { for (const dispose of destroy.splice(0)) dispose(); vi.unstubAllGlobals() })
+afterEach(() => { for (const dispose of destroy.splice(0)) dispose(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers() })
 function mount(opts = options()) { const result = mountMap(document.createElement('div'), node, '', opts); destroy.push(result.destroy); return result }
 function loaded(index = 0) { const map = fake.maps[index]; map.loaded = true; map.events.get('load')(); return map }
 describe('MapLibre engine boundary', () => {
@@ -64,7 +68,7 @@ describe('MapLibre engine boundary', () => {
     expect(fake.markers[1].remove).toHaveBeenCalledOnce()
     expect(map.sources.get('__genui_routes').setData).toHaveBeenCalledWith({ type: 'FeatureCollection', features: [] })
   })
-  it('keeps the shared worker URL until the final map stops, then cleans up once', () => {
+  it('keeps the shared worker URL until the final map removal call, then revokes once', () => {
     const first = mount(), second = mount()
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     first.destroy(); first.destroy()
@@ -113,4 +117,123 @@ it('cleans up a map and worker after post-constructor initialization fails', () 
   expect(fake.maps[0].remove).toHaveBeenCalledOnce()
   expect(fake.maps[0].events.size).toBe(0)
   expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:map-worker')
+})
+
+function workerCsp(change: Partial<SecurityPolicyViolationEvent> = {}) {
+  // jsdom lacks SecurityPolicyViolationEvent; use its browser-defined fields.
+  document.dispatchEvent(Object.assign(new Event('securitypolicyviolation'), {
+    disposition: 'enforce', effectiveDirective: 'worker-src', blockedURI: 'blob', ...change,
+  }))
+}
+
+describe('asynchronous worker startup failures', () => {
+  it.each(['blob', 'blob:', 'blob:map-worker'])('fails once on an enforced owned Blob worker violation (%s)', blockedURI => {
+    const opts = options(); mount(opts)
+    workerCsp({ blockedURI }); workerCsp({ blockedURI })
+    expect(opts.onError).toHaveBeenCalledOnce()
+    loaded()
+    expect(opts.onReady).not.toHaveBeenCalled()
+    expect(fake.maps[0].addLayer).not.toHaveBeenCalled()
+  })
+  it('observes CSP before Map construction, not after the worker has started', () => {
+    const opts = options(); fake.duringConstructor = () => workerCsp()
+    mount(opts)
+    expect(opts.onError).toHaveBeenCalledOnce()
+    loaded()
+    expect(opts.onReady).not.toHaveBeenCalled()
+  })
+  it('ignores report-only, unrelated directives and different complete worker URLs', () => {
+    const opts = options(); mount(opts)
+    const unrelated: Partial<SecurityPolicyViolationEvent>[] = [{ disposition: 'report' }, { effectiveDirective: 'script-src' },
+      { effectiveDirective: 'img-src' }, { blockedURI: 'https://synthetic.invalid/worker.js' },
+      { blockedURI: 'blob:another-worker' }]
+    for (const change of unrelated) workerCsp(change)
+    expect(opts.onError).not.toHaveBeenCalled()
+    loaded()
+    workerCsp()
+    expect(opts.onError).not.toHaveBeenCalled()
+    expect(opts.onReady).toHaveBeenCalledOnce()
+    const nextOpts = options(); mount(nextOpts); loaded(1)
+    expect(nextOpts.onReady).toHaveBeenCalledOnce()
+  })
+  it.each(['ready', 'error', 'destroy', 'constructor throw', 'initialization throw'])('removes the startup listener on %s', outcome => {
+    vi.useFakeTimers()
+    const add = vi.spyOn(document, 'addEventListener'), remove = vi.spyOn(document, 'removeEventListener')
+    const opts = options()
+    fake.constructorFailure = outcome === 'constructor throw'; fake.resetFailure = outcome === 'initialization throw'
+    if (fake.constructorFailure || fake.resetFailure) expect(() => mount(opts)).toThrow()
+    else {
+      const controller = mount(opts)
+      if (outcome === 'ready') loaded()
+      else if (outcome === 'error') fake.maps[0].events.get('error')()
+      else controller.destroy()
+    }
+    const subscriptions = add.mock.calls.filter(([name]) => name === 'securitypolicyviolation')
+    expect(subscriptions).toHaveLength(1)
+    expect(remove).toHaveBeenCalledWith('securitypolicyviolation', subscriptions[0]![1])
+    expect(vi.getTimerCount()).toBe(0)
+    const count = opts.onError.mock.calls.length
+    workerCsp(); vi.advanceTimersByTime(30000)
+    expect(opts.onError).toHaveBeenCalledTimes(count)
+  })
+  it('does not receive CSP violations dispatched in another document', () => {
+    const opts = options(); mount(opts)
+    const other = document.implementation.createHTMLDocument('Unrelated host')
+    other.dispatchEvent(Object.assign(new Event('securitypolicyviolation'), {
+      disposition: 'enforce', effectiveDirective: 'worker-src', blockedURI: 'blob',
+    }))
+    expect(opts.onError).not.toHaveBeenCalled()
+  })
+  it('cancels a pending instance without removing another pending listener or accepting its late load', () => {
+    const firstOpts = options(), secondOpts = options(), remountOpts = options()
+    const first = mount(firstOpts), lateLoad = fake.maps[0].events.get('load')
+    const second = mount(secondOpts)
+    first.destroy(); lateLoad(); workerCsp()
+    expect(firstOpts.onReady).not.toHaveBeenCalled()
+    expect(firstOpts.onError).not.toHaveBeenCalled()
+    expect(secondOpts.onError).toHaveBeenCalledOnce()
+    second.destroy()
+    expect(() => mount(remountOpts)).toThrow('Map worker blocked by document policy')
+    expect(remountOpts.onReady).not.toHaveBeenCalled()
+  })
+  it.each(['map error', 'constructor throw', 'initialization throw'])('does not cache an unrelated %s as a worker policy block', outcome => {
+    fake.constructorFailure = outcome === 'constructor throw'; fake.resetFailure = outcome === 'initialization throw'
+    if (fake.constructorFailure || fake.resetFailure) expect(() => mount()).toThrow()
+    else { const controller = mount(); fake.maps[0].events.get('error')(); controller.destroy() }
+    fake.constructorFailure = false; fake.resetFailure = false
+    const index = fake.maps.length, opts = options()
+    mount(opts); loaded(index)
+    expect(opts.onReady).toHaveBeenCalledOnce()
+    expect(opts.onError).not.toHaveBeenCalled()
+  })
+  it('remembers an observed block without a second CSP event, but isolates a fresh engine module', async () => {
+    const opts = options(), first = mount(opts)
+    workerCsp(); first.destroy(); first.destroy()
+    expect(fake.maps[0].remove).toHaveBeenCalledOnce()
+    expect(opts.onError).toHaveBeenCalledOnce()
+    const count = fake.maps.length
+    expect(() => mount()).toThrow('Map worker blocked by document policy')
+    expect(fake.maps).toHaveLength(count)
+    expect(URL.createObjectURL).toHaveBeenCalledOnce()
+    expect(URL.revokeObjectURL).toHaveBeenCalledOnce()
+    vi.resetModules()
+    const fresh = await import('../src/client/map-core.ts')
+    const freshOpts = options()
+    const controller = fresh.mountMap(document.createElement('div'), node, '', freshOpts)
+    destroy.push(controller.destroy); loaded(count)
+    expect(freshOpts.onReady).toHaveBeenCalledOnce()
+    expect(freshOpts.onError).not.toHaveBeenCalled()
+  })
+  it('isolates concurrent startup listeners and clears them across unmount/remount', () => {
+    const readyOpts = options(), pendingOpts = options(), remountOpts = options()
+    mount(readyOpts); loaded()
+    const pending = mount(pendingOpts)
+    workerCsp()
+    expect(readyOpts.onError).not.toHaveBeenCalled()
+    expect(pendingOpts.onError).toHaveBeenCalledOnce()
+    pending.destroy()
+    expect(() => mount(remountOpts)).toThrow('Map worker blocked by document policy')
+    expect(remountOpts.onReady).not.toHaveBeenCalled()
+    expect(readyOpts.onError).not.toHaveBeenCalled()
+  })
 })

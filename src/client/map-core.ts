@@ -9,6 +9,10 @@ import { maplibreCss, maplibreWorker } from './maplibre-resources.ts'
 const ROUTES = '__genui_routes'
 let workerUrl: string | undefined
 let users = 0
+// 5.6.2 can retain a CSP-blocked Worker in its private pool after Map.remove().
+// A real observed block is sticky for this engine instance; do not silently
+// retry the same dead pool on remount. A new page/engine has independent state.
+let workerPolicyBlocked = false
 /** Own this bundle's worker URL. MapLibre 5.6.2 retains an RTL global dispatcher,
  * so Map.remove() alone does not guarantee worker termination: acceptance blocker.
  */
@@ -50,8 +54,35 @@ export function unwrapRoute(points: readonly [number, number][]): [number, numbe
 }
 export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelection: string, options: MapMountOptions): MapController {
   if (maplibreWorker === '') throw new Error('MapLibre worker missing: use the packaged maplibre engine asset')
+  if (workerPolicyBlocked) throw new Error('Map worker blocked by document policy')
   injectCss()
   const releaseWorker = acquireWorker()
+  const startupWorkerUrl = workerUrl
+  let destroyed = false, failed = false, starting = true
+  function stopStartup(): void {
+    starting = false
+    document.removeEventListener('securitypolicyviolation', workerPolicyViolation)
+  }
+  function error(): void {
+    if (destroyed || failed) return
+    failed = true
+    stopStartup()
+    options.onError()
+  }
+  function workerPolicyViolation(event: SecurityPolicyViolationEvent): void {
+    if (!starting || event.disposition !== 'enforce' || event.effectiveDirective !== 'worker-src') return
+    // CSP3 strips non-HTTP URLs to their scheme. A document-level Blob worker
+    // denial therefore conservatively fails only this pending initialization;
+    // its UUID cannot be attributed. Never affect an already-ready Map, report-
+    // only policy, another directive, another full URL, or another document.
+    if (event.blockedURI === startupWorkerUrl || event.blockedURI === 'blob' || event.blockedURI === 'blob:') {
+      workerPolicyBlocked = true
+      error()
+    }
+  }
+  // 5.6.2 does not forward asynchronous Worker failures as Map errors. Observe
+  // enforced CSP before construction without changing the host policy.
+  document.addEventListener('securitypolicyviolation', workerPolicyViolation)
   let map: maplibre.Map
   try {
     map = new maplibre.Map({
@@ -59,8 +90,8 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
       center: initial.center !== undefined && isMapProjectable(initial.center) ? initial.center : [0, 0], zoom: initial.zoom ?? 1,
       minZoom: 0, maxZoom: 20, scrollZoom: false, dragRotate: false, touchPitch: false, attributionControl: {}, renderWorldCopies: true,
     })
-  } catch (error) { releaseWorker(); throw error }
-  let node = initial, selected = initialSelection, destroyed = false, styleReady = false
+  } catch (failure) { stopStartup(); releaseWorker(); throw failure }
+  let node = initial, selected = initialSelection, styleReady = false
   const markers = new Map<string, { marker: maplibre.Marker; button: HTMLButtonElement; click: () => void }>()
   function clearMarkers(): void {
     for (const { marker, button, click } of markers.values()) { button.removeEventListener('click', click); marker.remove() }
@@ -70,9 +101,10 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
     selected = id
     for (const [id, entry] of markers) entry.button.setAttribute('aria-pressed', String(id === selected))
     const location = node.locations.find(item => item.id === id)
-    if (location !== undefined && isMapProjectable(location.coordinates)) map.easeTo({ center: location.coordinates, duration: 0 })
+    if (!destroyed && !failed && location !== undefined && isMapProjectable(location.coordinates)) map.easeTo({ center: location.coordinates, duration: 0 })
   }
   function reset(): void {
+    if (destroyed || failed) return
     if (node.center !== undefined && isMapProjectable(node.center)) {
       map.jumpTo({ center: node.center, zoom: node.zoom ?? 10, bearing: 0, pitch: 0 })
       return
@@ -83,7 +115,7 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
     else map.fitBounds(bounds, { padding: 40, maxZoom: node.zoom ?? 14, duration: 0, bearing: 0 })
   }
   function renderData(): void {
-    if (destroyed) return
+    if (destroyed || failed) return
     const visibleLocations = node.locations.filter(location => isMapProjectable(location.coordinates))
     const ids = new Set(visibleLocations.map(location => location.id))
     for (const [id, entry] of markers) if (!ids.has(id)) {
@@ -121,13 +153,16 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
       map.addLayer({ id: ROUTES, type: 'line', source: ROUTES, paint: { 'line-color': '#315fa8', 'line-width': 4 } })
     }
   }
-  const styleLoad = (): void => { styleReady = true; renderData() }
-  const load = (): void => { styleLoad(); reset(); options.onReady() }
-  const error = (): void => { if (!destroyed) options.onError() }
+  const styleLoad = (): void => { if (!destroyed && !failed) { styleReady = true; renderData() } }
+  const load = (): void => {
+    if (destroyed || failed) return
+    styleLoad(); reset(); stopStartup(); options.onReady()
+  }
   map.on('load', load)
   map.on('style.load', styleLoad)
   map.on('error', error)
   try { renderData(); reset() } catch (failure) {
+    stopStartup()
     clearMarkers()
     map.off('load', load)
     map.off('style.load', styleLoad)
@@ -138,11 +173,12 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
   return {
     update(next, nextSelected) { node = next; selected = nextSelected; renderData() },
     select, reset,
-    zoom(delta) { map.zoomTo(Math.min(20, Math.max(0, map.getZoom() + delta)), { duration: 0 }) },
-    resize() { map.resize() },
+    zoom(delta) { if (!destroyed && !failed) map.zoomTo(Math.min(20, Math.max(0, map.getZoom() + delta)), { duration: 0 }) },
+    resize() { if (!destroyed && !failed) map.resize() },
     destroy() {
       if (destroyed) return
       destroyed = true
+      stopStartup()
       clearMarkers()
       map.off('load', load)
       map.off('style.load', styleLoad)
