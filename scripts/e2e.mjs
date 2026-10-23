@@ -294,6 +294,7 @@ try {
     await dismissCredentialsOverlay()
     await runGalleryFixedContexts({ browser, page, readyUrl, artifactsDir, galleryConversation, galleryAssets,
       createDismissCredentialsOverlay, log })
+    await galleryConversation?.verifyComputed({ page, browser, artifactsDir })
     // Percentage columns divide the space remaining after the row gap. Exercise
     // the installed renderer, including min-content pressure from a long code line.
     for (const width of [500, 280]) {
