@@ -15,7 +15,7 @@ async function bounded(promise, timeout, label) {
 export async function runGalleryFixedContexts({ browser, page, readyUrl, artifactsDir,
   galleryConversation, galleryAssets, createDismissCredentialsOverlay, log = console.log }) {
   const fixture = galleryConversation
-    ? 'Official rc.2 real conversation with deterministic local replay'
+    ? 'Official rc.3 real conversation with deterministic local replay'
     : 'Minimum-host DOM fence; no conversation or host action routing claim'
   const report = { fixture, identity: { hostSha: process.env.HOST_SHA ?? null,
     revision: process.env.GITHUB_SHA ?? null, browser: browser.version() },

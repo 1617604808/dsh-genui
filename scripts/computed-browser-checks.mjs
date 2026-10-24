@@ -39,7 +39,7 @@ export async function checkPanelAfterAppend(page) {
 }
 
 export async function runComputedBrowserChecks({ page, browser, artifactsDir, verifySubmit }) {
-  const report = { fixture: 'Official rc.2 replay conversation; installed tarball and exported HTML', passed: false }
+  const report = { fixture: 'Official rc.3 replay conversation; installed tarball and exported HTML', passed: false }
   let standalone
   try {
     let root = page.locator('[data-chat-flow-kind="assistant-step"] [data-genui-artifact]').filter({ has: page.getByText('Computed acceptance', { exact: true }) })

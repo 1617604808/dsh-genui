@@ -19,7 +19,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ github.event.release.tag_name }}
       PRERELEASE: ${{ github.event.release.prerelease }}
-      HOST_REF: dsh-v0.2.1-rc.2
+      HOST_REF: dsh-v0.2.1-rc.3
       MINIMUM_HOST_REF: dsh-v0.2.0-rc.1
 
     steps:

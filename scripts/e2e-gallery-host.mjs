@@ -1,4 +1,4 @@
-/** rc.2-only real conversation oracle for the existing no-key smoke job.
+/** rc.3-only real conversation oracle for the existing no-key smoke job.
  * Runtime files live under the caller's disposable DSH_HOME. No installation,
  * credentials, persisted session seeding, production patches, or new server.
  */
@@ -37,7 +37,7 @@ export async function prepareGalleryConversation({ dshRoot, dshHome, spec }) {
   const host = JSON.parse(await readFile(join(dshRoot, 'apps/cli/package.json'), 'utf8'))
   // Minimum rc.1 continues to run the reusable DOM-fence visual checks only.
   if (host.version === '0.2.0-rc.1') return null
-  assert.equal(host.version, '0.2.1-rc.2', 'Unrecognized host must not silently skip conversation coverage')
+  assert.equal(host.version, '0.2.1-rc.3', 'Unrecognized host must not silently skip conversation coverage')
   const replayModule = join(dshRoot, 'packages/test-support/llm-replay/lib/index.js')
   await access(replayModule) // Missing official build output is a failure, not a skip.
   const root = join(dshHome, 'gallery-e2e')
