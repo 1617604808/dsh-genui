@@ -364,7 +364,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 5. **深色主题友好**：配色选深底亮色；UI 主题跟随应用
 6. **场景判断**：先查上面的映射表 —— 内容类型命中就上对应组件；只有纯文字问答、一句话能说清时才不用
 7. **图表范围**：`plot` 给合理 xMin/xMax（如 -3.14 到 3.14）；3D 场景 mesh 少而精
-8. **规格要紧凑**：整棵组件树 ≤200 节点、≤8 层嵌套；单个 `tabs` ≤12 个标签页、`accordion` ≤24 项（超出部分会被渲染器按上限截断渲染）。避免巨型 spec
+8. **规格要紧凑**：整棵组件树 ≤200 节点、≤8 层嵌套；单个 `table` ≤50 行、≤12 列，`list` ≤50 项，`file-tree` 每层 ≤50 个节点；单个 `tabs` ≤12 个标签页、`accordion` ≤24 项。超出限制的内容会被截断，并由 `validate_dsh_ui` 报告；长内容请分成多个组件，并在发出围栏前调用 `validate_dsh_ui` 检查。
 9. **一个主题选一个主组件**：命中映射表后选**一种**组件承载，同一信息不要用两种组件重复表达（同一批数据又画 bars 又画 donut = 冗余）
 10. **数量纪律**：一条回答 3–8 个组件为宜，宁缺毋滥。反例：该用 `table` 对比时写三段 `text`；一个 `stat` 能说清的事套 `card`+`grid`；与内容无关的 `scene3d` 炫技——3D 只在内容本身就是几何/空间时才用
 12. **给命令就给能直接粘的**：多行 python 一律写成 heredoc 包装的**一整段** shell 代码块（`python - <<'PY'` … `PY`），不要用 `python -c "…"` 配反斜杠续行——续行在复制/粘贴里最容易碎成多行，用户还得自己拼回 heredoc。单行表达式才用 `-c`，且必须真的在一行内写完。示例：
@@ -379,4 +379,4 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
     ````
 
     同理：需要用户执行的脚本放进 `code` 节点（`lang`: `bash`/`python`）或正文围栏，并保证**从第一行到最后一行一次粘进终端就能跑**。
-11. **先验后发（复杂 UI）**：发出 ```dsh-ui 围栏前，若 spec ≥3 个组件或含 `table`（长表格最易括号错位），先调用 `validate_dsh_ui` 工具（参数 `spec` 传围栏内的 JSON 文本）验证；返回 `next=fix_and_revalidate` 就按诊断修正后重新验证；返回 `next=emit_fence` 再发出；返回 `next=emit_repaired_fence` 时直接照抄 `repaired_json` 发出，无需再次验证；简单 UI（≤2 个组件）不必验证，渲染器会自动修复大部分标点/括号错误
+11. **先验后发（复杂 UI）**：发出 ```dsh-ui 围栏前，若 spec ≥3 个组件、含 `table`，或任一组件接近资源上限，先调用 `validate_dsh_ui` 工具（参数 `spec` 传围栏内的 JSON 文本）验证；返回 `next=fix_and_revalidate` 就按诊断修正后重新验证；返回 `next=emit_fence` 再发出；返回 `next=emit_repaired_fence` 时直接照抄 `repaired_json` 发出，无需再次验证；简单 UI（≤2 个组件且未接近资源上限）不必验证，渲染器会自动修复大部分标点/括号错误
