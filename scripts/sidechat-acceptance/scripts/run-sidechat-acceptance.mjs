@@ -170,8 +170,10 @@ async function lifecycle({ root, host, env, own, snapshotReport }) {
   return { ...resume, origin, seed, workspaceId: workspace.workspaceId, seedExit, readBackendSnapshot, waitForBackendAction,
     bindUiAwaySession, uiAway: () => uiAway }
 }
-async function setupRoot(own) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh354-owned-'))
+export async function setupRoot(own) {
+  // The host canonicalizes workspace paths; compare ownership against the
+  // same path even when TMPDIR uses a symlink (such as /var on macOS).
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh354-owned-')))
   own(() => rm(root, { recursive: true, force: true }))
   const env = sidechatSmokeEnvironment(process.env, root)
   await Promise.all(['workspace', 'tool-home', 'home', 'cache', 'config', 'tmp'].map(name => mkdir(join(root, name))))
