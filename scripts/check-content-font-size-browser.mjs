@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { JSDOM } from 'jsdom'
 
@@ -8,7 +10,16 @@ const browser = process.env.BROWSER_BIN ?? (process.platform === 'darwin' ? '/Ap
 let checked = 0
 for (const fixtureName of ['content-font-size.html', 'plot-content-font-size.html']) {
   const fixture = pathToFileURL(resolve('tests/browser', fixtureName)).href
-  const output = execFileSync(browser, ['--headless', '--no-sandbox', '--disable-gpu', '--disable-background-networking', '--no-first-run', '--dump-dom', fixture], { encoding: 'utf8', timeout: 30000 })
+  const profile = mkdtempSync(join(tmpdir(), 'dsh-genui-font-browser-'))
+  let output
+  try {
+    output = execFileSync(browser, [
+      '--headless', '--no-sandbox', '--disable-gpu', '--disable-background-networking', '--no-first-run',
+      '--password-store=basic', '--use-mock-keychain', `--user-data-dir=${profile}`, '--dump-dom', fixture,
+    ], { encoding: 'utf8', timeout: 30000 })
+  } finally {
+    rmSync(profile, { recursive: true, force: true })
+  }
   const document = new JSDOM(output).window.document
   const results = JSON.parse(document.getElementById('results').textContent)
   const rootCount = fixtureName === 'content-font-size.html' ? 2 : 1

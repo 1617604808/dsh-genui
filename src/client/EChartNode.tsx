@@ -402,6 +402,26 @@ function optItemStyleColor(color: string | undefined, _i: number, _series: unkno
   return color !== undefined ? { itemStyle: { color } } : {}
 }
 
+/** Refresh typography without replaying preset data or interactive defaults. */
+function fontSizeOption(option: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(option)) {
+    if (key === 'fontSize' || key === 'sizeRange') {
+      result[key] = value
+    } else if (Array.isArray(value)) {
+      const children = value.map(item => item !== null && typeof item === 'object'
+        ? fontSizeOption(item as Record<string, unknown>) : {})
+      // ECharts merges component arrays by index. Keep empty entries so a
+      // slider's text style cannot be applied to the preceding inside zoom.
+      if (children.some(child => Object.keys(child).length > 0)) result[key] = children
+    } else if (value !== null && typeof value === 'object') {
+      const child = fontSizeOption(value as Record<string, unknown>)
+      if (Object.keys(child).length > 0) result[key] = child
+    }
+  }
+  return result
+}
+
 export function EChartNode({ node }: { node: GenuiEChart }) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -463,7 +483,7 @@ export function EChartNode({ node }: { node: GenuiEChart }) {
       const nextContentFontSize = getComputedStyle(document.body).getPropertyValue('--dsh-content-font-size').trim()
       if (nextContentFontSize === contentFontSize) return
       contentFontSize = nextContentFontSize
-      if (instanceRef.current !== null) instanceRef.current.setOption(presetOption(node, ref.current), true)
+      if (instanceRef.current !== null) instanceRef.current.setOption(fontSizeOption(presetOption(node, ref.current)))
     })
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] })
     return () => observer.disconnect()
