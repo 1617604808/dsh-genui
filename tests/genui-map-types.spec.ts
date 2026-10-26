@@ -1,5 +1,5 @@
 // Consumer declaration contract: no engine dependency is needed for host config.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import ts from 'typescript'
@@ -21,7 +21,7 @@ it('type-checks public map configuration with the engine package unavailable', (
     expect(diagnostics.map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([])
     expect(readFileSync('src/client/map-config.ts', 'utf8')).not.toMatch(/from ['"]maplibre-gl/)
     // Existing hosts can keep the vendor's richer type without a structural cast.
-    writeFileSync(file, readFileSync(file, 'utf8') + `\nimport type { StyleSpecification } from ${JSON.stringify(resolve('node_modules/maplibre-gl/dist/maplibre-gl.d.ts'))};\ndeclare const vendorStyle: StyleSpecification; const vendorConfig: GenuiMapConfig = { style: vendorStyle }; void vendorConfig;\n`)
+    writeFileSync(file, readFileSync(file, 'utf8') + `\nimport type { StyleSpecification } from ${JSON.stringify(realpathSync(resolve('node_modules/maplibre-gl/dist/maplibre-gl.d.ts')))};\ndeclare const vendorStyle: StyleSpecification; const vendorConfig: GenuiMapConfig = { style: vendorStyle }; void vendorConfig;\n`)
     const vendorProgram = ts.createProgram([file], options)
     expect(ts.getPreEmitDiagnostics(vendorProgram).map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([])
   } finally { rmSync(dir, { recursive: true, force: true }) }

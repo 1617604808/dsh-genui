@@ -41,10 +41,10 @@ the literals in `GenuiBlock.module.css` are last-resort fallbacks.
 Those engines are loaded at runtime from their own packages under their own
 licenses; they are not vendored into this repository.
 
-## MapLibre GL JS 5.6.2 (BSD-3-Clause)
+## MapLibre GL JS 6.16.0 (BSD-3-Clause)
 
 The lazy maplibre asset bundles the pinned official npm distribution, including
-its CSP main, worker, and CSS. Source: https://github.com/maplibre/maplibre-gl-js/tree/v5.6.2
+its ESM main, module worker, and CSS. Source: https://github.com/maplibre/maplibre-gl-js/tree/v6.16.0
 
 ```text
 Copyright (c) 2023, MapLibre contributors

@@ -76,7 +76,7 @@ function cssModulesPlugin(): NonNullable<UserConfig['plugins']>[number] {
   }
 }
 
-/** CSS and CSP worker stay inert in the lazy engine, including offline exports. */
+/** CSS and the self-contained module worker stay inert until the lazy map mounts. */
 function maplibreResourcesPlugin(): NonNullable<UserConfig['plugins']>[number] {
   const source = resolvePath(PROJECT_ROOT, 'src/client/maplibre-resources.ts')
   const virtualId = '\0dsh-genui-maplibre-resources'
@@ -89,7 +89,7 @@ function maplibreResourcesPlugin(): NonNullable<UserConfig['plugins']>[number] {
       if (id !== virtualId) return null
       const dist = resolvePath(PROJECT_ROOT, 'node_modules/maplibre-gl/dist')
       const cssFile = resolvePath(dist, 'maplibre-gl.css')
-      const workerFile = resolvePath(dist, 'maplibre-gl-csp-worker.js')
+      const workerFile = resolvePath(dist, 'maplibre-gl-worker.mjs')
       this.addWatchFile(cssFile)
       this.addWatchFile(workerFile)
       const css = await readFile(cssFile, 'utf8')
@@ -258,6 +258,8 @@ function assetConfig(name: 'mermaid' | 'three' | 'echarts' | 'echarts-core' | 'e
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
+      // The IIFE has no module URL. Every mount supplies our embedded worker Blob URL.
+      ...(name === 'maplibre' ? { 'import.meta.url': 'undefined' } : {}),
     },
     plugins: [purityGate(), maplibreResourcesPlugin()],
     outputOptions: {

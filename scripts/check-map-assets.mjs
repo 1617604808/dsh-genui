@@ -13,7 +13,7 @@ if (!engine.includes('maplibregl-ctrl-attrib') || !engine.includes('MapLibre GL 
   throw new Error('maplibre asset is missing vendor CSS/main/worker content')
 }
 const sandbox = {
-  console,
+  console, TextDecoder, TextEncoder,
   URL: { createObjectURL() { throw new Error('worker Blob was created before map mount') } },
 }
 // Asset evaluation alone must neither create a worker nor touch the DOM.

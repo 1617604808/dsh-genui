@@ -1,5 +1,5 @@
 /** Heavy engine: imported ONLY by the maplibre asset entry. */
-import * as maplibre from 'maplibre-gl/dist/maplibre-gl-csp.js'
+import * as maplibre from 'maplibre-gl'
 import type { GeoJSONSource, StyleSpecification } from 'maplibre-gl'
 import type { GenuiMap } from './spec.ts'
 import type { MapController, MapMountOptions } from './map-lazy.ts'
@@ -9,13 +9,10 @@ import { maplibreCss, maplibreWorker } from './maplibre-resources.ts'
 const ROUTES = '__genui_routes'
 let workerUrl: string | undefined
 let users = 0
-// 5.6.2 can retain a CSP-blocked Worker in its private pool after Map.remove().
-// A real observed block is sticky for this engine instance; do not silently
-// retry the same dead pool on remount. A new page/engine has independent state.
+// Preserve an observed document-policy block for this engine instance.
+// A new page/engine starts with independent policy evidence.
 let workerPolicyBlocked = false
-/** Own this bundle's worker URL. MapLibre 5.6.2 retains an RTL global dispatcher,
- * so Map.remove() alone does not guarantee worker termination: acceptance blocker.
- */
+/** Own the module-worker URL; MapLibre releases its pool after the final Map.remove(). */
 function acquireWorker(): () => void {
   if (workerUrl === undefined) {
     workerUrl = URL.createObjectURL(new Blob([maplibreWorker], { type: 'text/javascript' }))
@@ -80,8 +77,8 @@ export function mountMap(container: HTMLElement, initial: GenuiMap, initialSelec
       error()
     }
   }
-  // 5.6.2 does not forward asynchronous Worker failures as Map errors. Observe
-  // enforced CSP before construction without changing the host policy.
+  // Observe enforced CSP before construction without changing the host policy;
+  // browser worker startup failures need not emit a Map error.
   document.addEventListener('securitypolicyviolation', workerPolicyViolation)
   let map: maplibre.Map
   try {

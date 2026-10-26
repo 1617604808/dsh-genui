@@ -68,18 +68,20 @@ MapLibre attribution controls remain enabled for host basemaps.
 
 ## Loading, embedding, and standalone HTML
 
-MapLibre 5.6.2 is pinned to the official npm package (BSD-3-Clause). Its separate
-CSP main and self-contained worker distributions allow the existing flat asset
-route and unchanged standalone policy to work without external worker imports.
-The ~1.3 MB engine, vendor CSS, and inert worker source live in the independent
+MapLibre 6.16.0 is pinned to the official npm package (BSD-3-Clause). Its ESM
+main and self-contained module worker replace the older CSP distributions. The
+worker bytes are embedded in the existing flat asset, so no separate worker
+file or external module import is needed by the offline default.
+The ~1.67 MB engine, vendor CSS, and inert worker source live in the independent
 `lib/assets/maplibre.js` IIFE, not the eager client/standalone runtime. The engine
 is requested only when a map mounts, not by idle prefetch. CSS is injected then;
-a Blob worker URL is created at first mount. The final unmount calls `Map.remove()`
-and revokes the owned URL. **Known release blocker:** MapLibre 5.6.2 retains an
-RTL global dispatcher and its worker after the last map is removed. The real
-browser cleanup check still requires termination and fails; this is not complete
-resource cleanup. No private worker-pool mutation or security-policy relaxation
-is used to hide that failure.
+a Blob module-worker URL is created at first mount. The final unmount calls
+`Map.remove()` and revokes the owned URL. The upstream 6.16.0 release includes
+[the shared worker lifecycle fix](https://github.com/maplibre/maplibre-gl-js/pull/8491).
+The real browser cleanup check still requires worker termination and has to pass
+on the upgraded candidate before release. Source inspection, unit tests and
+bundle checks do not establish that gate. No private worker-pool mutation or
+security-policy relaxation is used to bypass it.
 
 Bundler hosts should copy the **built** `@changfenhuang/dsh-genui/assets/maplibre`
 IIFE alongside the other assets and call `setGenuiAssetBase` with that directory.
@@ -103,23 +105,20 @@ successful mocked engine test is not a real browser/WebGL acceptance result.
 
 ### Initialization failure
 
-MapLibre 5.6.2 can fail to start its worker without emitting a Map error. The
+Browser worker startup failures need not emit a Map error. The
 renderer observes enforced `worker-src` CSP violations before constructing the
 map, without changing the policy. An exact owned worker URL is matched when
 available. CSP3 may redact a Blob URL to `blob`; that document-level denial is
 conservatively applied only while this map is initializing. Report-only policy,
 other resource directives, other complete URLs, and already-ready maps are not
-affected. Startup listeners are removed on readiness, error, or unmount. Because this
-engine version retains failed workers in its pool, an observed matching CSP block
-is remembered by this private engine instance. Later mounts, including host
-configuration replacements, immediately retain the list fallback rather than
-retrying a dead worker and waiting forever. Already-ready maps and separate engine
-instances are unaffected. After correcting the host policy, reload the page to
-retry. The scheme-only case is a conservative document-level inference, not an
+affected. Startup listeners are removed on readiness, error, or unmount. An observed
+matching CSP block is remembered by this private engine instance. Later mounts,
+including host configuration replacements, immediately retain the list fallback
+under the same blocked policy. Already-ready maps and separate engine instances
+are unaffected. After correcting the host policy, reload the page to retry. The scheme-only case is a conservative document-level inference, not an
 exact worker-UUID attribution.
 
 A late load cannot restore controls after failure. Selecting a location still
 changes only local state, and sending it still requires the separate explicit
 submit action. This scoped CSP fallback does not fix other silent worker startup
-failures or the separate worker termination blocker above; it does not impose a
-new time limit on trusted basemap loading.
+failures; it does not impose a new time limit on trusted basemap loading.

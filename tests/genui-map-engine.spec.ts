@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fake = vi.hoisted(() => ({ maps: [] as any[], markers: [] as any[], setWorkerUrl: vi.fn(), constructorFailure: false, resetFailure: false, duringConstructor: undefined as (() => void) | undefined }))
 vi.mock('../src/client/maplibre-resources.ts', () => ({ maplibreCss: '.maplibre-test{}', maplibreWorker: 'self.onmessage = () => {}' }))
-vi.mock('maplibre-gl/dist/maplibre-gl-csp.js', () => ({
+vi.mock('maplibre-gl', () => ({
   setWorkerUrl: fake.setWorkerUrl,
   Map: class {
     options: any; events = new Map<string, () => void>(); sources = new Map<string, any>(); loaded = false

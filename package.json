@@ -172,7 +172,7 @@
     "immer": "11.1.21",
     "jsdom": "^25.0.0",
     "lightningcss": "^1.25.0",
-    "maplibre-gl": "5.6.2",
+    "maplibre-gl": "6.16.0",
     "mdast-util-gfm": "3.1.0",
     "mdast-util-math": "3.0.0",
     "mermaid": "11.16.0",
