@@ -120,5 +120,21 @@ describe('gallery validation feedback', () => {
     expect(result).not.toContain('warning=policy_truncated')
     expect(result).toContain('next=emit_fence')
   })
-})
 
+  it('reports data-array policy truncation through validate_dsh_ui', async () => {
+    const result = String(await tool.execute({ spec: { items: [
+      { type: 'table', columns: ['value'], rows: Array.from({ length: GENUI_LIMITS.maxTableRows + 1 }, (_, index) => [`row ${index}`]) },
+      { type: 'list', items: Array.from({ length: GENUI_LIMITS.maxListItems + 1 }, (_, index) => `item ${index}`) },
+      { type: 'list', items: Array.from({ length: GENUI_LIMITS.maxListItems + 1 }, (_, index) => ({ type: 'text', content: `node ${index}` })) },
+      { type: 'file-tree', items: Array.from({ length: GENUI_LIMITS.maxListItems + 1 }, (_, index) => ({ name: `node ${index}`, type: 'file' })) },
+    ] } }))
+
+    expect(result).toContain('status=valid')
+    expect(result).toContain('warning=policy_truncated')
+    expect(result).not.toContain('repair dropped')
+    expect(result).toContain('1 行超出 table.rows')
+    expect(result).toContain('2 项超出 list.items')
+    expect(result).toContain('1 个节点超出 file-tree 每层')
+    expect(result).toContain('next=emit_fence')
+  })
+})
