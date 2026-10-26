@@ -26,6 +26,11 @@
 - DSH `0.2.1-rc.3` 复用工作区现有空白会话；双插件验收核对请求、响应、选中行和持久化记录对应同一会话。
 - BetterSidebar 侧边对话渲染需要提供 `registerSidechatSurfaceAdapter` 的配套发布版本；DSH 原生 Side Chat 需要 provider 提供 `genuiSidechat`。
 
+### 致谢
+
+- 感谢 [@Taza67](https://github.com/Taza67) 在 [#368](https://github.com/omdsh-dev/dsh-genui/pull/368) 中提交宿主字号跟随的早期实现与问题分析；该改进最终通过 [#372](https://github.com/omdsh-dev/dsh-genui/pull/372) 合入。
+- 感谢 [@wang-kaopu](https://github.com/wang-kaopu) 对字号适配（[#372](https://github.com/omdsh-dev/dsh-genui/pull/372)）与截断诊断（[#373](https://github.com/omdsh-dev/dsh-genui/pull/373)）的贡献。
+
 ## [0.14.0] - 2026-10-21
 
 ### 新增
