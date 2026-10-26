@@ -1698,7 +1698,9 @@ export function validateCanonicalGenuiSpec(value: unknown): GenuiValidation {
     }
   }
   walk(v.items, 0, 'items')
-  if (errors.length === 0) errors.push(...analyzeSubmissionRegistry(v as unknown as GenuiSpec).diagnostics)
+  // Submission membership follows the rendered tree: policy-elided fields
+  // cannot conflict with visible fields or require unavailable groups.
+  if (errors.length === 0 && repaired !== null) errors.push(...analyzeSubmissionRegistry(repaired).diagnostics)
   if (repaired !== null) {
     for (const id of getDuplicateComputedInputIds(repaired)) {
       errors.push(`spec.items contains duplicate input field ID '${id}'`)

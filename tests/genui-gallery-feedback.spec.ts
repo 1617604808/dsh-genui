@@ -137,4 +137,35 @@ describe('gallery validation feedback', () => {
     expect(result).toContain('1 个节点超出 file-tree 每层')
     expect(result).toContain('next=emit_fence')
   })
+
+  it('excludes omitted list fields and submits from submission validation', async () => {
+    const result = String(await tool.execute({ spec: { items: [
+      { type: 'input', id: 'amount' },
+      { type: 'list', items: [
+        ...Array.from({ length: GENUI_LIMITS.maxListItems }, () => 'Visible'),
+        { type: 'input', id: 'amount' },
+        { type: 'submit', label: 'Omitted', groups: ['missing'] },
+      ] },
+    ] } }))
+
+    expect(result).toContain('status=valid')
+    expect(result).toContain('warning=policy_truncated')
+    expect(result).toContain('2 项超出 list.items')
+    expect(result).toContain('next=emit_fence')
+    expect(result).not.toContain('invalid_spec')
+  })
+
+  it('still rejects duplicate submission fields that remain inside the list cap', async () => {
+    const result = String(await tool.execute({ spec: { items: [
+      { type: 'input', id: 'amount' },
+      { type: 'list', items: [
+        { type: 'input', id: 'amount' },
+        ...Array.from({ length: GENUI_LIMITS.maxListItems }, () => 'Visible'),
+      ] },
+    ] } }))
+
+    expect(result).toContain('status=invalid')
+    expect(result).toContain('submission key')
+    expect(result).toContain('next=fix_and_revalidate')
+  })
 })
