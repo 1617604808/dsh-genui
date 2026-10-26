@@ -131,6 +131,9 @@ jobs:
       - name: Check real browser newline layout and selection
         run: node scripts/check-text-newlines-browser.mjs
 
+      - name: Check host content font size in real browser
+        run: node scripts/check-content-font-size-browser.mjs
+
       - name: Archive newline browser evidence
         if: always()
         uses: actions/upload-artifact@v4
