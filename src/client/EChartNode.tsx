@@ -79,10 +79,8 @@ function themeColors(el?: HTMLElement | null): {
   }
 }
 
-/** Build a full ECharts option from a preset + the simple data/series shape.
- *  `el` is the chart's own container: theme tokens are resolved against it so
- *  host colours are found wherever the host defines them. */
-function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string, unknown> {
+/** 根据预设和数据生成完整的 ECharts option，并从图表容器读取宿主主题颜色。 */
+export function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string, unknown> {
   const t = themeColors(el)
   // Each palette slot carries its own fallback hue: if the host lacks the
   // static tokens, series must still be distinguishable (the old code fell
@@ -91,7 +89,9 @@ function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string
     ? [...node.palette]
     : CHART_COLORS.map((c, i) =>
       readToken(c.replace('var(', '').replace(')', ''), SERIES_FALLBACK[i % SERIES_FALLBACK.length]!, el))
-  const data = node.data ?? []
+  // 坐标轴预设保留空位置；独立图形省略缺失值，同时保留真实零值。
+  const independentMarks = ['wordCloud', 'pie', 'gauge', 'funnel', 'treemap'].includes(node.preset ?? '')
+  const data = (node.data ?? []).filter(d => !independentMarks || typeof d.value === 'number' && Number.isFinite(d.value))
   const series = node.series
 
   // Shared tooltip base: renderMode 'richText' prevents ECharts from writing
@@ -197,7 +197,12 @@ function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string
       // polygon. `data` alone is treated as a single unnamed series.
       const entries = series ?? [{ label: '', data }]
       const indicators = (entries[0]?.data ?? []).map(d => ({ name: d.label, max: undefined as number | undefined }))
-      const max = Math.max(...entries.flatMap(e => e.data.map(d => Number(d.value) || 0)), 1)
+      const completeEntries = entries.flatMap((entry, index) => {
+        const values = entry.data.map(d => typeof d.value === 'number' && Number.isFinite(d.value) ? d.value : null)
+        // 雷达图需要完整坐标；缺失数据不能在原点显示为真实零值。
+        return values.some(value => value === null) ? [] : [{ entry, index, values: values as number[] }]
+      })
+      const max = Math.max(...completeEntries.flatMap(({ values }) => values), 1)
       return {
         ...base,
         tooltip: tt({ trigger: 'item' }),
@@ -213,10 +218,10 @@ function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string
           type: 'radar',
           symbolSize: 5,
           areaStyle: { opacity: 0.12 },
-          data: entries.map((e, i) => ({
-            name: e.label,
-            value: e.data.map(d => Number(d.value) || 0),
-            ...optItemStyleColor(e.color, i, series),
+          data: completeEntries.map(({ entry, index, values }) => ({
+            name: entry.label,
+            value: values,
+            ...optItemStyleColor(entry.color, index, series),
           })),
         }],
       }
@@ -335,7 +340,8 @@ function presetOption(node: GenuiEChart, el?: HTMLElement | null): Record<string
       // row's labels — the same shape the other presets use.
       const rows = series ?? [{ label: '', data }]
       const cols = (rows[0]?.data ?? []).map(d => d.label)
-      const values = rows.flatMap((row, y) => row.data.map((d, x) => [x, y, Number(d.value) || 0]))
+      const values = rows.flatMap((row, y) => row.data.flatMap((d, x) =>
+        typeof d.value === 'number' && Number.isFinite(d.value) ? [[x, y, d.value]] : []))
       const max = Math.max(...values.map(v => v[2] as number), 1)
       return {
         ...base,
