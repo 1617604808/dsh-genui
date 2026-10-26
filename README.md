@@ -141,6 +141,7 @@ dsh-genui Capabilities
 
 ### 2. 🎨 30+ Component Ecosystem
 - **Display & Typography**: Hero banner, Stat cards (`stat` with eyebrow labels, deltas, and sparklines), Tables, Timelines, Code Diffs, Step progress, File trees (interactive expand/collapse), Callouts, and Badges.
+- **Content Font Size**: Card typography grows with the host's Appearance → Content Font Size setting above 17px. At 17px or below, each component keeps its existing size. Standalone HTML exports keep their existing sizes.
 - **Advanced Tables**:
   - Click headers to **sort locally** (ascending / descending / reset) with smart parsing for numbers, currency, commas, percentages, and `k/m/b` units;
   - Columns support inline progress bars (`bar`), rings (`ring`), sparklines (`spark`), and badges;
