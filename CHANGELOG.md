@@ -11,6 +11,8 @@
 
 ### 修复
 
+- 围栏 JSON 支持修复结构位置的全角逗号、顿号、分号和冒号，保留字符串内的原始标点，并与引号及缺失括号修复共用解析规则（#369）。
+- Mermaid 管道边标签中的裸 `@` 自动加引号；修复只作用于实际边标签，保留节点文字、已有引号和注释（#366）。
 - 保持跨页签输入字段的稳定身份，防止密码内容进入普通字段。
 - 无效数字输入隐藏后不再提交旧值；动态复选框更新文案时保留选中状态。
 - 面板追加先按顺序合并再验证计算引用，无法解决的引用显示错误。
@@ -28,6 +30,7 @@
 
 ### 致谢
 
+- 感谢 [@tinysunspot](https://github.com/tinysunspot) 对全角标点问题的定位与修复建议（[#369](https://github.com/omdsh-dev/dsh-genui/issues/369)），以及 [@Ananpng123](https://github.com/Ananpng123) 对 Mermaid 边标签问题的报告和 [@sunxiuguo](https://github.com/sunxiuguo) 补充的节点内容反例（[#366](https://github.com/omdsh-dev/dsh-genui/issues/366)）。
 - 感谢 [@Taza67](https://github.com/Taza67) 在 [#368](https://github.com/omdsh-dev/dsh-genui/pull/368) 中提交宿主字号跟随的早期实现与问题分析；该改进最终通过 [#372](https://github.com/omdsh-dev/dsh-genui/pull/372) 合入。
 - 感谢 [@wang-kaopu](https://github.com/wang-kaopu) 对字号适配（[#372](https://github.com/omdsh-dev/dsh-genui/pull/372)）与截断诊断（[#373](https://github.com/omdsh-dev/dsh-genui/pull/373)）的贡献。
 
