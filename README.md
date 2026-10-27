@@ -321,7 +321,7 @@ You can import `GenuiBlock`, `GenuiActionContext`, and `processGenuiSpec` from `
 
 ### dsh-go integration
 
-The mobile bundle reuses the complete GenUI renderer, including controls, computed values, quizzes, ECharts, Mermaid and 3D. It supplies a versioned bridge for native state, actions, theme and sizing, with all engine assets bundled offline. The companion App integration connects Markdown fences, tool cards and session panels. Older Apps retain the read-only native tool-card projection. See [installation and verification](docs/dsh-go.md).
+The dsh-go integration uses the App’s existing native cards, inline choices and plugin panels; no App patch or replacement APK is needed. The complete web spec stays authoritative. Native panels support choices, switches, buttons, submissions, local grading, tabs, accordions, copy and confirmed HTTPS links. Validation can produce one JSON fence readable by both renderers. Panels currently require the local-engine dsh-go bridge; SSH and relay hosts retain native tool cards. Advanced graphics and free-text input remain explicit limitations. See [capabilities and verification](docs/dsh-go.md).
 
 ---
 

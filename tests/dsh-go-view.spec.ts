@@ -55,11 +55,9 @@ describe('dsh-go native projection', () => {
   it.each([
     { items: [{ type: 'button', label: 'Submit', action: 'submit' }] },
     { items: [{ type: 'echart', option: { series: [] } }] },
-    { items: [{ type: 'stat', label: 'Trend', value: '5', spark: [1, 5] }] },
     { items: [{ type: 'chart', stacked: true, data: [{ label: 'A', value: 5 }] }] },
     { items: [{ type: 'chart', data: [{ label: 'A', value: 1 }, { label: 'A', value: 2 }] }] },
     { items: [{ type: 'table', columns: ['A'], rows: [[1]], details: [[{ type: 'text', content: 'detail' }]] }] },
-    { items: [{ type: 'stat', label: 'Computed', value: '5' }], computed: [{ id: 'a', expr: '1+2' }] },
     { items: [{ type: 'text', content: 'Panel' }], panel: true },
   ])('keeps unsupported cards on the full web path, with no partial native card: %j', value => {
     expect(toDshGoView(value as GenuiSpec)).toBeNull()

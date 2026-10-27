@@ -339,7 +339,15 @@
         }
       ]
     },
-    "native": null
+    "native": {
+      "type": "stack",
+      "children": [
+        {
+          "type": "text",
+          "text": "value"
+        }
+      ]
+    }
   },
   {
     "name": "panel routing",
@@ -404,7 +412,37 @@
         }
       ]
     },
-    "native": null
+    "native": {
+      "type": "stack",
+      "children": [
+        {
+          "type": "stack",
+          "children": [
+            {
+              "type": "metric",
+              "label": "Trend",
+              "value": "5"
+            },
+            {
+              "type": "chart",
+              "kind": "line",
+              "categories": [
+                "1",
+                "2"
+              ],
+              "series": [
+                {
+                  "values": [
+                    1,
+                    5
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
   },
   {
     "name": "bytes",

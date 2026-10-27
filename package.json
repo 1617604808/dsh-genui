@@ -23,7 +23,6 @@
     "./assets/echarts-core": "./src/client/asset-echarts-core.ts",
     "./assets/echarts": "./src/client/asset-echarts.ts",
     "./assets/standalone": "./lib/assets/standalone-runtime.js",
-    "./assets/mobile": "./lib/assets/mobile-runtime.js",
     "./skill": "./SKILL.md"
   },
   "files": [
@@ -48,7 +47,6 @@
     "src",
     "tsconfig.json",
     "tsdown.config.ts",
-    "scripts/install-mobile.mjs",
     "lib/assets/echarts-core.js",
     "lib/assets/echarts-full.js",
     "ICON-NAMES.md",
@@ -195,8 +193,6 @@
     "test": "vitest run",
     "check": "node scripts/clean.mjs && tsc -p tsconfig.json && vitest run && tsdown && node scripts/check-standalone.mjs",
     "check:host-api": "node scripts/check-host-api.mjs",
-    "check:mobile-browser": "node scripts/check-mobile-browser.mjs",
-    "install:mobile": "node scripts/install-mobile.mjs",
     "prepack": "node scripts/prepack.mjs"
   },
   "dsh": {
@@ -262,6 +258,44 @@
     },
     "@deepseek-ai/dsh-util-values": {
       "optional": true
+    }
+  },
+  "dshGo": {
+    "v": 1,
+    "title": {
+      "zh": "GenUI",
+      "en": "GenUI"
+    },
+    "icon": "chart",
+    "contributes": {
+      "composer.actions": [
+        {
+          "id": "open-genui",
+          "label": {
+            "zh": "GenUI",
+            "en": "GenUI"
+          },
+          "icon": "chart",
+          "effect": {
+            "type": "open",
+            "page": "panel:genui"
+          }
+        }
+      ],
+      "panels": [
+        {
+          "id": "genui",
+          "title": {
+            "zh": "GenUI",
+            "en": "GenUI"
+          },
+          "icon": "chart",
+          "placement": [
+            "session.tab",
+            "chat.panel"
+          ]
+        }
+      ]
     }
   }
 }

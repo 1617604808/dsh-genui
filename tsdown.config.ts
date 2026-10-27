@@ -90,7 +90,7 @@ function purityGate(): NonNullable<UserConfig['plugins']>[number] {
   }
 }
 
-function standaloneAliasPlugin(lazyAssets = false): NonNullable<UserConfig['plugins']>[number] {
+function standaloneAliasPlugin(): NonNullable<UserConfig['plugins']>[number] {
   const adapterPath = resolvePath(PROJECT_ROOT, 'src/client/primitive-adapter.ts')
   const standaloneAdapterPath = resolvePath(PROJECT_ROOT, 'src/client/standalone/primitive-adapter.tsx')
   const assetLoaderPath = resolvePath(PROJECT_ROOT, 'src/client/asset-loader.ts')
@@ -101,7 +101,7 @@ function standaloneAliasPlugin(lazyAssets = false): NonNullable<UserConfig['plug
       if (importer === undefined) return null
       const resolved = resolvePath(dirname(importer), source)
       if (resolved === adapterPath) return standaloneAdapterPath
-      return !lazyAssets && resolved === assetLoaderPath ? standaloneAssetLoaderPath : null
+      return resolved === assetLoaderPath ? standaloneAssetLoaderPath : null
     },
   }
 }
@@ -264,12 +264,6 @@ export default [
   libConfig,
   clientConfig,
   standaloneConfig,
-  {
-    ...standaloneConfig,
-    name: `${ID}/mobile`,
-    entry: { 'assets/mobile-runtime': 'src/client/mobile/runtime.tsx' },
-    plugins: [standaloneAliasPlugin(true), cssModulesPlugin(), standaloneKatexCssPlugin()],
-  },
   assetConfig('mermaid', 'src/client/asset-mermaid.ts'),
   assetConfig('three', 'src/client/asset-three.ts'),
   assetConfig('echarts-core', 'src/client/asset-echarts-core.ts'),

@@ -32,11 +32,6 @@ export interface FileLinkAvailability {
 
 const FileLinkOpenContext = createContext<((path: string, line?: number) => void) | undefined>(undefined)
 
-/** Native embedders provide navigation bound to the owning session. */
-export function withNativeFileLinkContext(open: ((path: string, line?: number) => void) | undefined, children: ReactNode): ReactNode {
-  return createElement(FileLinkOpenContext.Provider, { value: open }, children)
-}
-
 /** Track an optional host service through arrival, removal, and plugin unload. */
 export function createFileLinkAvailability(ctx: FileLinkCordisContext): FileLinkAvailability {
   let available = ctx.get('sidebarRight', false)?.openResource !== undefined
