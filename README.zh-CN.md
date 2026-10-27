@@ -316,6 +316,10 @@ node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 
 ---
 
+### dsh-go 原生显示
+
+支持的 `render_ui` 结果会附带 dsh-go 原生只读卡片，并保留完整的网页版数据。指标、基础图表、表格、步骤和进度可在 App 的工具结果展开区显示。正文围栏和复杂交互组件还需要 App 侧支持，详见[适配范围与验证方法](docs/dsh-go.md)。
+
 ### Sidechat surface 接入（可选）
 
 GenUI 可在 provider 明确提供的 sidechat surface 上渲染已结算的 `dsh-ui` 围栏。BetterSidebar 使用现有的 `registerSidechatSurfaceAdapter` 能力；其他 provider 可提供可选的 `genuiSidechat` Cordis service。每个 surface 都携带所属线程身份和专属 prompt 回调，因此动作与交互状态留在对应子线程。流式内容及不支持或无效的围栏保留原 Markdown。

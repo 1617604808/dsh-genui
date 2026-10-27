@@ -29,6 +29,7 @@ import { completeFenceJson } from '../shared/fence-repair.ts'
 import { droppedNodeFailure } from './genui-diagnostic.ts'
 import { collectInlineContentWarnings } from './inline-content-diagnostic.ts'
 import type { GenuiSpec } from '../client/spec.ts'
+import { toDshGoView } from './dsh-go-view.ts'
 
 /**
  * Arguments schema: an open `spec` slot. The schema must NOT reject anything
@@ -218,7 +219,13 @@ export function createRenderUiTool(): ToolDefinition {
         // spec is JSON-safe by construction (only string/number/boolean/array
         // fields after repair), so the widening cast is lossless.
         const processed = processRenderableValue(specOf(args))
-        return (isRenderableProcess(processed) ? processed.spec : null) as unknown as JsonValue
+        if (!isRenderableProcess(processed) || processed.spec === null) return null
+        const nativeView = toDshGoView(processed.spec)
+        // Keep the original root fields for existing web clients and replay.
+        // dsh-go reads only the namespaced, read-only native projection.
+        return (nativeView === null ? processed.spec : {
+          ...processed.spec, 'dsh-go/view': nativeView,
+        }) as unknown as JsonValue
       },
     },
     async execute(args: unknown): Promise<JsonValue> {

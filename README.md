@@ -319,6 +319,10 @@ To customize plugin behaviors, add configurations under `cordis.patch.yml` in yo
 
 You can import `GenuiBlock`, `GenuiActionContext`, and `processGenuiSpec` from `@changfenhuang/dsh-genui/embed` to embed the renderer into any React application supporting CSS Modules.
 
+### dsh-go native display
+
+Supported `render_ui` results include a read-only native card for dsh-go while retaining the complete web spec. Metrics, basic charts, tables, steps and progress can display in the App's expanded tool results. Inline fences and advanced interactive components need separate App support. See [scope and verification](docs/dsh-go.md).
+
 ---
 
 ### Sidechat surfaces (optional)
