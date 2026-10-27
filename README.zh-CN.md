@@ -316,9 +316,9 @@ node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 
 ---
 
-### dsh-go 原生显示
+### dsh-go 接入
 
-支持的 `render_ui` 结果会附带 dsh-go 原生只读卡片，并保留完整的网页版数据。指标、基础图表、表格、步骤和进度可在 App 的工具结果展开区显示。正文围栏和复杂交互组件还需要 App 侧支持，详见[适配范围与验证方法](docs/dsh-go.md)。
+移动端 bundle 复用完整 GenUI 渲染器，包含控件、计算值、测验、ECharts、Mermaid 和 3D；通过带版本的桥接协议处理原生状态、操作回传、主题和尺寸，图形引擎随 App 离线打包。配套 App 改动接入正文围栏、工具卡片和会话面板。旧版 App 仍可使用只读原生工具卡片，详见[安装与验证方法](docs/dsh-go.md)。
 
 ### Sidechat surface 接入（可选）
 

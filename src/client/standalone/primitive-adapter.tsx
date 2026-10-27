@@ -61,6 +61,8 @@ export function JsonTree({ data, label, copyable, labels }: { data: object | unk
 
 /** 将文本复制到系统剪贴板。 */
 export async function writeClipboard(text: string): Promise<boolean> {
+  const native = (window as unknown as { __GenuiNativeClipboard__?: (text: string) => Promise<boolean> }).__GenuiNativeClipboard__
+  if (native !== undefined) return native(text)
   if (typeof navigator.clipboard?.writeText === 'function') {
     try {
       await navigator.clipboard.writeText(text)

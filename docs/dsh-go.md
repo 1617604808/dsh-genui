@@ -1,35 +1,58 @@
-# dsh-go native tool cards
+# dsh-go integration
 
-`render_ui` now includes a read-only native projection under `presentationMeta["dsh-go/view"]` when the **entire** card is representable. dsh-go displays it in the expanded tool result. No App patch, SDK dependency, extra plugin, or `dshGo` manifest is required for this tool-card path. Install the built package into the DSH profile used by dsh-go and restart that profile; only new tool calls receive the metadata.
+There are two compatible paths. An older App can display a read-only native projection of supported `render_ui` results. The complete integration uses the mobile bundle plus the companion App changes: installing this npm package alone cannot add a renderer to an existing native App.
 
-The original GenUI fields remain at the metadata root. Existing web clients, the panel and replay continue using the original spec.
+## Complete renderer
 
-## Scope
+`lib/assets/mobile-runtime.js` bundles the shared GenUI renderer and React without the web host's module loader. It supports the built-in component families, including forms, quizzes, computed values, tables, tabs, SVG, plots, ECharts, Mermaid and 3D. Engine bundles and KaTeX fonts are packaged locally; no CDN or host web session is required to load them. External images/audio/video still require reachable media URLs. Relative web-origin media URLs must be resolved by the embedding host; they are not phone filesystem paths. Custom components registered by other web plugins are not included in this bundle.
 
-| GenUI | Native display |
-| --- | --- |
-| `row`, `grid` | Wrapping row |
-| `col`, `card` | Stack; card heading and eyebrow retained |
-| `text`, `badge`, `divider`, `spacer` | Native text |
-| `stat`, `hero` | Metric / text; delta retained |
-| `chart` | Bar, horizontal bar, line, donut; series aligned by category with null gaps |
-| `table` | Read-only table |
-| `progress` | Progress bar |
-| `steps` | Native step sequence |
-| `keyvalue`, `callout` | Key/value list, semantic callout |
+Build and install the offline assets:
 
-Native styling follows the App. Table sorting/export, grid column counts and ring styling are not reproduced. Sparklines, stacked charts, computed values, filters, table details/totals/visual cells, panel operations, interactive controls, tabs, quizzes, ECharts, plots, Mermaid, SVG and 3D keep the full web path. A mixed card containing an unsupported component receives **no** partial native projection; the original spec and tool arguments remain available. This is native display compatibility, not full renderer or action-loop parity.
+```sh
+pnpm install --frozen-lockfile
+pnpm run build
+node scripts/install-mobile.mjs /path/to/app/assets/genui
+```
 
-Cards must fit the native budget: 8 KiB UTF-8, 40 nodes, depth 6, 16 children per layout, 60 chart categories, 6 series, 8 table columns, 50 table rows, 12 steps and 24 key/value pairs. Oversized cards keep the original metadata instead of silently truncating.
+Declare `assets/genui/` in the Flutter assets list and apply the companion App integration before building the App. Keep the generated runtime, five engine bundles, HTML entry, manifest and license notices together. The install command validates the built inputs before copying and writes a SHA-256 manifest. Re-run it whenever the renderer changes.
+
+The App integration connects:
+
+- Closed `dsh-ui` fences and successful `render_ui` tool results, including cards retained outside collapsed turns.
+- Model actions through the originating session's send callback using `[genui-action] <action> <JSON payload>`; stale, background and busy-session actions are gated.
+- Native clipboard and session-scoped workspace file previews.
+- Session panels with ordered replacement/append, replay deduplication, tab merging and restart restoration.
+- Durable, secret-free control state, separated by host, session, message and fence/tool identity.
+- Theme, font scale, measured height, expanded views, renderer recovery and a bounded number of live WebViews.
+
+Incomplete streaming fences retain the App's loading/interruption UI. Invalid documents or asset failures offer a retry and the original JSON. The full renderer does not translate advanced components into native approximations.
+
+## Bridge protocol v1
+
+Load the packaged `index.html`, register a `GenuiNative.postMessage(string)` channel, and call `window.__GenuiMobile__.render(frame)` after page load. Serialize `frame` as JSON data; never interpolate model text into HTML or executable JavaScript.
+
+```json
+{"version":1,"id":"opaque-card-id","token":"unguessable-mount-token","spec":{"items":[{"type":"button","label":"Continue","action":"continue"}]},"theme":"light","locale":"en","canAct":true,"canOpenFiles":false,"textScale":1}
+```
+
+Optional `state` contains the native owner's saved interaction state. Optional `panels` supplies ordered panel documents instead of `spec`; append operations use the same tab-aware merge as web panels. Keep a panel's `id` stable across appends and change it on replacement.
+
+Events carry `version`, `id`, `token` and `type`. Supported events are `ready`, `height`, `state`, `action`, `link`, `file`, `clipboard`, and `error`. Validate ownership, type and size on the native side. A clipboard request also has `request` and `text`; acknowledge it with `window.__GenuiMobile__.reply({id,token,request,ok})`. Other events require no acknowledgement. This protocol gives documents no host credentials, JavaScript execution service or arbitrary native RPC access.
+
+On teardown call `dispose()`, discard the bridge owner, and destroy the native WebView after it detaches. Persist secret-free `state` events before resuming in a fresh renderer. The packaged CSP blocks inline scripts, frames and network requests; lazy engines load from the package directory. External link navigation is delegated to the native host.
+
+## Older App compatibility
+
+`render_ui` retains the complete GenUI fields at the metadata root. When the entire document fits the native subset, it also includes `presentationMeta["dsh-go/view"]`. This path needs no App patch and handles layout, text, metrics, basic charts, tables, progress, steps, key/value lists and callouts.
+
+Advanced or mixed interactive documents receive no partial projection. Native limits are 8 KiB UTF-8, 40 nodes, depth 6 and 16 children per layout, with additional per-component limits. The complete mobile renderer is a separate path and is not restricted to this projection's component vocabulary.
 
 ## Verification
 
-Ask the model to call `render_ui` with:
-
-```json
-{"spec":{"title":"GenUI check","items":[{"type":"stat","label":"Revenue","value":"128,430","delta":"+12.4%"},{"type":"chart","kind":"bars","data":[{"label":"Jan","value":98},{"label":"Feb","value":112},{"label":"Mar","value":128}]},{"type":"table","columns":["Service","Status"],"rows":[["API","Online"],["Worker","Online"]]}]}}
+```sh
+pnpm run check
+BROWSER_BIN=/path/to/chrome pnpm run check:mobile-browser
+GENUI_BROWSER_TRANSPORT=file BROWSER_BIN=/path/to/chrome pnpm run check:mobile-browser
 ```
 
-Expand the result in dsh-go: expect a metric, bar chart and table. Reopen the same session in DSH web: expect the original interactive GenUI card.
-
-Inline `dsh-ui` fences are a separate App integration: dsh-go must recognize GenUI's `{items:[...]}` dialect in its Markdown renderer. Updating this plugin alone does not enable that path. Advanced components and action feedback require further App support and are not claimed here.
+The browser check exercises the built bundle, offline lazy engines, bridge ownership, native clipboard acknowledgement, password exclusion, state restoration, action gating, theme changes and teardown. The companion App tests cover fence identity, collapsed tool-card placement, panel ordering/replay/restore, native bridge validation and background recovery with a fake platform WebView. These checks do not replace Android device acceptance of touch/scroll, GPU availability, renderer loss and the installed App's local/SSH/relay connections.
