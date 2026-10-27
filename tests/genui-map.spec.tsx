@@ -161,3 +161,70 @@ it('retains the usable selection when a known blocked worker also rejects a conf
   expect((button('Reset view') as HTMLButtonElement).disabled).toBe(true)
   expect(mocks.destroy).toHaveBeenCalledOnce()
 })
+
+
+describe('map integration with declared-field and structural identity rules', () => {
+  it('includes Map fields in snapshots and removes them only when the field is removed', async () => {
+    const snapshot = vi.fn()
+    const view = render(<GenuiBlock spec={spec} onStateSnapshot={snapshot} />)
+    await ready()
+    fireEvent.click(button('Beta'))
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ place: 'b' })
+    view.rerender(<GenuiBlock spec={{ items: [{ type: 'text', content: 'Map removed' }] }} onStateSnapshot={snapshot} />)
+    await waitFor(() => expect(snapshot.mock.calls.at(-1)?.[0].fields).toBeUndefined())
+    view.rerender(<GenuiBlock spec={spec} onStateSnapshot={snapshot} />)
+    await ready()
+    expect(button('Beta').getAttribute('aria-pressed')).toBe('false')
+    expect(button('Confirm')).toHaveProperty('disabled', true)
+  })
+
+  it('isolates maps in different tabs while preserving each declared field on return', async () => {
+    const onAction = vi.fn()
+    const snapshot = vi.fn()
+    const tabs: GenuiSpec = { items: [{ type: 'tabs', tabs: [
+      { label: 'First map', items: [{ ...map, id: 'first' }] },
+      { label: 'Second map', items: [{ ...map, id: 'second' }] },
+    ] }] }
+    render(<GenuiActionContext.Provider value={onAction}><GenuiBlock spec={tabs} onStateSnapshot={snapshot} /></GenuiActionContext.Provider>)
+    await ready()
+    fireEvent.click(button('Alpha'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Second map' }))
+    await ready()
+    expect(button('Alpha').getAttribute('aria-pressed')).toBe('false')
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ first: 'a' })
+    fireEvent.click(button('Beta'))
+    fireEvent.click(screen.getByRole('tab', { name: 'First map' }))
+    await ready()
+    expect(button('Alpha').getAttribute('aria-pressed')).toBe('true')
+    expect(button('Beta').getAttribute('aria-pressed')).toBe('false')
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ first: 'a', second: 'b' })
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
+  it('does not seed a replacement field from the previous map at the same slot', async () => {
+    const snapshot = vi.fn()
+    const view = render(<GenuiBlock spec={{ items: [map] }} onStateSnapshot={snapshot} />)
+    await ready()
+    fireEvent.click(button('Alpha'))
+    view.rerender(<GenuiBlock spec={{ items: [{ ...map, id: 'replacement' }] }} onStateSnapshot={snapshot} />)
+    await ready()
+    expect(button('Alpha').getAttribute('aria-pressed')).toBe('false')
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toBeUndefined()
+    fireEvent.click(button('Beta'))
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ replacement: 'b' })
+  })
+
+  it('does not carry local selection between anonymous maps in separate tab paths', async () => {
+    const anonymous: GenuiMap = { type: 'map', locations: [a, b] }
+    const tabs: GenuiSpec = { items: [{ type: 'tabs', tabs: [
+      { label: 'First map', items: [anonymous] },
+      { label: 'Second map', items: [anonymous] },
+    ] }] }
+    render(<GenuiBlock spec={tabs} />)
+    await ready()
+    fireEvent.click(button('Alpha'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Second map' }))
+    await ready()
+    expect(button('Alpha').getAttribute('aria-pressed')).toBe('false')
+  })
+})

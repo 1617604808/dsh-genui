@@ -177,14 +177,16 @@ describe('Map real-browser acceptance contract (no browser launched)', () => {
     expect(e2e).toContain("console.error('✗ e2e 异常:', MAP ? safeMapError(e) : e)")
     expect(e2e).toContain("console.error(MAP ? safeMapError(lines.join('\\n') || '(空)')")
   })
-  it('prepares only the pinned rc.2 official replay and explicitly excludes rc.1 host-action claims', async () => {
+  it('prepares only the pinned rc.3 official replay and explicitly excludes rc.1 host-action claims', async () => {
     const root = await mkdtemp(join(tmpdir(), 'map-replay-contract-')); directories.push(root)
     await mkdir(join(root, 'apps/cli'), { recursive: true })
     await writeFile(join(root, 'apps/cli/package.json'), JSON.stringify({ version: '0.2.0-rc.1' }))
     expect(await prepareMapConversation({ dshRoot: root, dshHome: root, spec: createMapSpec() })).toBeNull()
-    await writeFile(join(root, 'apps/cli/package.json'), JSON.stringify({ version: 'unexpected' }))
-    await expect(prepareMapConversation({ dshRoot: root, dshHome: root, spec: createMapSpec() })).rejects.toThrow('Unrecognized host')
-    await writeFile(join(root, 'apps/cli/package.json'), JSON.stringify({ version: '0.2.1-rc.2' }))
+    for (const version of ['unexpected', '0.2.1-rc.2']) {
+      await writeFile(join(root, 'apps/cli/package.json'), JSON.stringify({ version }))
+      await expect(prepareMapConversation({ dshRoot: root, dshHome: root, spec: createMapSpec() })).rejects.toThrow('Unrecognized host')
+    }
+    await writeFile(join(root, 'apps/cli/package.json'), JSON.stringify({ version: '0.2.1-rc.3' }))
     await expect(prepareMapConversation({ dshRoot: root, dshHome: root, spec: createMapSpec() })).rejects.toThrow()
     await mkdir(join(root, 'packages/test-support/llm-replay/lib'), { recursive: true })
     await writeFile(join(root, 'packages/test-support/llm-replay/lib/index.js'), '// Not executed by this pure fixture test')
@@ -203,6 +205,8 @@ describe('Map real-browser acceptance contract (no browser launched)', () => {
     const workflow = parse(await readFile('.github/workflows/ci.yml', 'utf8'))
     expect(Object.keys(workflow.jobs)).toEqual(['check', 'browser-text-newlines', 'windows-pack'])
     expect(workflow.permissions).toBeUndefined()
+    expect(workflow.jobs.check.strategy.matrix.include.map((lane: { 'host-ref': string }) => lane['host-ref']))
+      .toEqual(['dsh-v0.2.0-rc.1', 'dsh-v0.2.1-rc.3', 'dsh-v0.2.1-rc.3'])
     const steps = workflow.jobs.check.steps
     const step = steps.find((s: { name?: string }) => s.name?.startsWith('Map real browser'))
     expect(step.run).toContain('--smoke --map --install tarball')

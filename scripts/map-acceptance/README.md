@@ -31,7 +31,7 @@ References:
   markers, so markers alone cannot pass a broken GeoJSON worker.
 - Keyboard list → marker, marker → list, clear, zoom geometry, reset, ordinary
   wheel non-zoom behavior, and local selection without implicit actions.
-- On rc.2 only: a real isolated session via official APIs and ReplayAdapter;
+- On rc.3 only: a real isolated session via official APIs and ReplayAdapter;
   exactly one initial prompt, zero additional calls during navigation, then
   one explicit submit carrying `fields.destination = "east"`, one fresh input
   request, and the second real assistant acknowledgment. rc.1 explicitly gets

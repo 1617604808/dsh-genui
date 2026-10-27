@@ -1,6 +1,6 @@
 /** Test-only Cordis plugin. Real AgentLoop + official local ReplayAdapter, no
  * seeded messages, fake conversation services, renderer patches, or endpoints.
- * Loaded only by e2e.mjs's fresh rc.2 smoke profile through --patch.
+ * Loaded only by e2e.mjs's fresh rc.3 smoke profile through --patch.
  */
 import assert from 'node:assert/strict'
 import { appendFileSync } from 'node:fs'
