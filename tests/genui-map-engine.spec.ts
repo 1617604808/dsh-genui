@@ -24,12 +24,14 @@ let mountMap: typeof import('../src/client/map-core.ts').mountMap
 let offlineMapStyle: typeof import('../src/client/map-core.ts').offlineMapStyle
 let unwrapRoute: typeof import('../src/client/map-core.ts').unwrapRoute
 import type { GenuiMap } from '../src/client/spec.ts'
+let ownsWorker: typeof import('../src/client/map-worker-ownership.ts').isOwnedMapWorkerUrl
 const node: GenuiMap = { type: 'map', locations: [{ id: 'a', label: '<script>attack</script>', coordinates: [179, 10] }, { id: 'b', label: 'B', coordinates: [-179, 20] }], routes: [{ id: 'route', label: 'Route', coordinates: [[179, 10], [-179, 20]] }] }
 const options = () => ({ onSelect: vi.fn(), onError: vi.fn(), onReady: vi.fn(), markerLabel: (s: string) => s })
 const destroy: Array<() => void> = []
 beforeEach(async () => {
   vi.resetModules()
   ;({ mountMap, offlineMapStyle, unwrapRoute } = await import('../src/client/map-core.ts'))
+  ;({ isOwnedMapWorkerUrl: ownsWorker } = await import('../src/client/map-worker-ownership.ts'))
   fake.maps.length = 0; fake.markers.length = 0; fake.constructorFailure = false; fake.resetFailure = false; fake.duringConstructor = undefined; vi.clearAllMocks()
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:map-worker'), revokeObjectURL: vi.fn() }))
 })
@@ -70,10 +72,13 @@ describe('MapLibre engine boundary', () => {
   })
   it('keeps the shared worker URL until the final map removal call, then revokes once', () => {
     const first = mount(), second = mount()
+    expect(ownsWorker('blob:map-worker')).toBe(true)
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     first.destroy(); first.destroy()
+    expect(ownsWorker('blob:map-worker')).toBe(true)
     expect(URL.revokeObjectURL).not.toHaveBeenCalled()
     second.destroy()
+    expect(ownsWorker('blob:map-worker')).toBe(false)
     expect(fake.maps[1].remove).toHaveBeenCalledOnce()
     expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:map-worker')
     expect(fake.maps.every(map => map.events.size === 0)).toBe(true)
@@ -101,6 +106,7 @@ it('preserves polar records but never plots or centers them at a different locat
 it('releases the worker URL on constructor failure', () => {
   fake.constructorFailure = true
   expect(() => mount()).toThrow('WebGL unavailable')
+  expect(ownsWorker('blob:map-worker')).toBe(false)
   expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:map-worker')
 })
 
@@ -114,6 +120,7 @@ it('continues updating inline routes while an existing source is loading', () =>
 it('cleans up a map and worker after post-constructor initialization fails', () => {
   fake.resetFailure = true
   expect(() => mount()).toThrow('reset failed')
+  expect(ownsWorker('blob:map-worker')).toBe(false)
   expect(fake.maps[0].remove).toHaveBeenCalledOnce()
   expect(fake.maps[0].events.size).toBe(0)
   expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:map-worker')

@@ -9,10 +9,12 @@
  * the production browser bundle carries no sourcemap, so the same source
  * builds byte-identical client.js every time.
  */
-import { readFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { readFile, realpath } from 'node:fs/promises'
 import { basename, dirname, extname, relative, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { UserConfig } from 'tsdown'
+import { Rolldown } from 'tsdown'
 import { transform } from 'lightningcss'
 
 const ID = '@changfenhuang/dsh-genui'
@@ -76,12 +78,62 @@ function cssModulesPlugin(): NonNullable<UserConfig['plugins']>[number] {
   }
 }
 
-/** CSS and the self-contained module worker stay inert until the lazy map mounts. */
+const MAPLIBRE_VERSION = '6.16.0'
+const MAPLIBRE_MAIN_SHA256 = 'fbbdf8ddd9a48e49059a4be6795a4f214a711314bb5809f72d3730b48e7897e3'
+const MAPLIBRE_WORKER_SHA256 = '0bf06492bdb7ba3d4132b78e435621bfba60d5250967991c02b1a73affea8cd5'
+const WORKER_FACTORY_PREFIX = 'async function al(){let e=kn.WORKER_URL||el(),t=!tl(e);'
+
+/**
+ * Local, version-locked packaging adaptation, not a public MapLibre API.
+ * Chromium cannot start the module worker from file://. Its file origin also
+ * sends a .cjs Blob through vendor fetch(), forbidden by our offline CSP.
+ * Only our exact live Blob takes the direct classic Worker path on file://;
+ * native Worker still enforces CSP/origin rules. Every unowned/HTTP path and
+ * the vendor pool lifecycle remain unchanged. Fail closed on vendor changes.
+ */
+export function adaptMaplibreWorkerFactory(code: string, version: string, ownershipModule: string): string {
+  if (version !== MAPLIBRE_VERSION || createHash('sha256').update(code).digest('hex') !== MAPLIBRE_MAIN_SHA256
+    || code.split(WORKER_FACTORY_PREFIX).length !== 2) throw new Error('MapLibre worker adapter requires the audited 6.16.0 main distribution')
+  return `import { isOwnedMapWorkerUrl as __genuiOwnsWorker } from ${JSON.stringify(ownershipModule)};\n`
+    + code.replace(WORKER_FACTORY_PREFIX, WORKER_FACTORY_PREFIX
+      + 'if(globalThis.location?.protocol==="file:"&&e.startsWith("blob:")&&__genuiOwnsWorker(e))return new Worker(e);')
+}
+
+/** Rebundle the official worker as a single classic-compatible IIFE, no runtime dependencies. */
+export async function buildMaplibreClassicWorker(workerFile: string): Promise<string> {
+  const source = await readFile(workerFile, 'utf8')
+  if (createHash('sha256').update(source).digest('hex') !== MAPLIBRE_WORKER_SHA256) throw new Error('MapLibre worker adapter requires the audited 6.16.0 worker distribution')
+  const bundle = await Rolldown.rolldown({
+    // The package marks modules side-effect-free; the worker entry's self.worker
+    // initialization must survive even though its default export is unused.
+    input: '\0genui-maplibre-worker', platform: 'browser', treeshake: false,
+    plugins: [{
+      name: 'genui-maplibre-worker-entry',
+      resolveId(id) { if (id === '\0genui-maplibre-worker') return id },
+      load(id) { if (id === '\0genui-maplibre-worker') return `import ${JSON.stringify(workerFile)};` },
+    }],
+  })
+  try {
+    const { output } = await bundle.generate({ format: 'iife', minify: true, codeSplitting: false })
+    const [chunk] = output
+    if (output.length !== 1 || chunk?.type !== 'chunk' || chunk.imports.length !== 0 || chunk.dynamicImports.length !== 0) throw new Error('MapLibre worker must be a self-contained classic script')
+    return chunk.code
+  } finally { await bundle.close() }
+}
+
+/** CSS and the self-contained worker stay inert until the lazy map mounts. */
 function maplibreResourcesPlugin(): NonNullable<UserConfig['plugins']>[number] {
   const source = resolvePath(PROJECT_ROOT, 'src/client/maplibre-resources.ts')
   const virtualId = '\0dsh-genui-maplibre-resources'
   return {
     name: 'dsh-genui-maplibre-resources',
+    async transform(code, id) {
+      if (!id.endsWith('/maplibre-gl/dist/maplibre-gl.mjs')) return null
+      const main = resolvePath(PROJECT_ROOT, 'node_modules/maplibre-gl/dist/maplibre-gl.mjs')
+      if (await realpath(id) !== await realpath(main)) throw new Error('Unexpected MapLibre main distribution')
+      const pkg = JSON.parse(await readFile(resolvePath(main, '../../package.json'), 'utf8')) as { version: string }
+      return adaptMaplibreWorkerFactory(code, pkg.version, resolvePath(PROJECT_ROOT, 'src/client/map-worker-ownership.ts'))
+    },
     resolveId(id: string, importer: string | undefined) {
       return importer !== undefined && resolvePath(dirname(importer), id) === source ? virtualId : null
     },
@@ -93,7 +145,7 @@ function maplibreResourcesPlugin(): NonNullable<UserConfig['plugins']>[number] {
       this.addWatchFile(cssFile)
       this.addWatchFile(workerFile)
       const css = await readFile(cssFile, 'utf8')
-      const worker = (await readFile(workerFile, 'utf8')).replace(/\/\/# sourceMappingURL=.*$/gm, '')
+      const worker = await buildMaplibreClassicWorker(workerFile)
       return `export const maplibreCss = ${JSON.stringify(css)}; export const maplibreWorker = ${JSON.stringify(worker)};`
     },
   }

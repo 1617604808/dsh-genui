@@ -44,7 +44,13 @@ licenses; they are not vendored into this repository.
 ## MapLibre GL JS 6.16.0 (BSD-3-Clause)
 
 The lazy maplibre asset bundles the pinned official npm distribution, including
-its ESM main, module worker, and CSS. Source: https://github.com/maplibre/maplibre-gl-js/tree/v6.16.0
+its ESM main, worker, and CSS. Source: https://github.com/maplibre/maplibre-gl-js/tree/v6.16.0
+
+Local packaging modifications: the official worker is rebundled as a
+classic-compatible IIFE. A version/digest-checked worker-factory adaptation
+uses a native classic Worker only for this engine's exact owned Blob on
+`file://`; upstream behavior is unchanged for other URLs/origins. See
+`tsdown.config.ts` and `docs/map.md`. The upstream license text follows unchanged.
 
 ```text
 Copyright (c) 2023, MapLibre contributors

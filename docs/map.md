@@ -69,19 +69,35 @@ MapLibre attribution controls remain enabled for host basemaps.
 ## Loading, embedding, and standalone HTML
 
 MapLibre 6.16.0 is pinned to the official npm package (BSD-3-Clause). Its ESM
-main and self-contained module worker replace the older CSP distributions. The
+main and self-contained worker replace the older CSP distributions. The
 worker bytes are embedded in the existing flat asset, so no separate worker
 file or external module import is needed by the offline default.
 The ~1.67 MB engine, vendor CSS, and inert worker source live in the independent
 `lib/assets/maplibre.js` IIFE, not the eager client/standalone runtime. The engine
 is requested only when a map mounts, not by idle prefetch. CSS is injected then;
-a Blob module-worker URL is created at first mount. The final unmount calls
+a Blob worker URL is created at first mount. HTTP(S) retains MapLibre's module
+worker path; offline `file://` uses a classic worker as described below. The final unmount calls
 `Map.remove()` and revokes the owned URL. The upstream 6.16.0 release includes
 [the shared worker lifecycle fix](https://github.com/maplibre/maplibre-gl-js/pull/8491).
 The real browser cleanup check still requires worker termination and has to pass
 on the upgraded candidate before release. Source inspection, unit tests and
 bundle checks do not establish that gate. No private worker-pool mutation or
 security-policy relaxation is used to bypass it.
+
+**File-origin compatibility adaptation.** Chromium rejects the Blob module
+worker from a `file://` document. Merely marking the URL as `.cjs` makes the
+vendor's file-origin branch fetch the Blob, which conflicts with our unchanged
+`connect-src 'none'`. The build therefore compiles the official worker into a
+single classic-compatible IIFE and applies a narrow local adaptation to the
+6.16.0 worker factory: only the exact currently owned Blob URL, in a `file://`
+document, is passed directly to the native classic `Worker` constructor. This
+is a version-specific packaging adaptation, not a public MapLibre API. All
+unowned URLs and non-file origins retain the original factory behavior. Native
+Worker CSP/origin checks remain enforced; no global `Worker`, `fetch` or
+`location` override is used. The build checks the version and SHA-256 of both
+official main and worker distributions and fails closed if either changes;
+an upgrade requires a fresh audit. The original browser offline/reload,
+zero-network, CSP and worker-cleanup assertions remain the acceptance gate.
 
 Bundler hosts should copy the **built** `@changfenhuang/dsh-genui/assets/maplibre`
 IIFE alongside the other assets and call `setGenuiAssetBase` with that directory.

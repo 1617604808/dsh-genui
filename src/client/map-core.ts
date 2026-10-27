@@ -5,6 +5,7 @@ import type { GenuiMap } from './spec.ts'
 import type { MapController, MapMountOptions } from './map-lazy.ts'
 import { mapBounds, isMapProjectable } from './map-data.ts'
 import { maplibreCss, maplibreWorker } from './maplibre-resources.ts'
+import { setOwnedMapWorkerUrl } from './map-worker-ownership.ts'
 
 const ROUTES = '__genui_routes'
 let workerUrl: string | undefined
@@ -12,10 +13,11 @@ let users = 0
 // Preserve an observed document-policy block for this engine instance.
 // A new page/engine starts with independent policy evidence.
 let workerPolicyBlocked = false
-/** Own the module-worker URL; MapLibre releases its pool after the final Map.remove(). */
+/** Own the worker URL; MapLibre releases its pool after the final Map.remove(). */
 function acquireWorker(): () => void {
   if (workerUrl === undefined) {
     workerUrl = URL.createObjectURL(new Blob([maplibreWorker], { type: 'text/javascript' }))
+    setOwnedMapWorkerUrl(workerUrl)
     maplibre.setWorkerUrl(workerUrl)
   }
   users++
@@ -26,6 +28,7 @@ function acquireWorker(): () => void {
     if (--users === 0 && workerUrl !== undefined) {
       URL.revokeObjectURL(workerUrl)
       workerUrl = undefined
+      setOwnedMapWorkerUrl(undefined)
     }
   }
 }
