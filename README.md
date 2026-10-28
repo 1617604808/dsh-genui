@@ -319,6 +319,10 @@ To customize plugin behaviors, add configurations under `cordis.patch.yml` in yo
 
 You can import `GenuiBlock`, `GenuiActionContext`, and `processGenuiSpec` from `@changfenhuang/dsh-genui/embed` to embed the renderer into any React application supporting CSS Modules.
 
+### dsh-go integration
+
+The dsh-go integration uses the App’s existing native cards, inline choices and plugin panels; no App patch or replacement APK is needed. The complete web spec stays authoritative. Native panels support choices, switches, buttons, submissions, local grading, tabs, accordions, copy and confirmed HTTPS links. Validation can produce one JSON fence readable by both renderers. Panels currently require the local-engine dsh-go bridge; SSH and relay hosts retain native tool cards. Advanced graphics and free-text input remain explicit limitations. See [capabilities and verification](docs/dsh-go.md).
+
 ---
 
 ### Sidechat surfaces (optional)

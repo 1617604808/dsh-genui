@@ -37,6 +37,7 @@
     "SKILL.md",
     "docs/copy-preview.md",
     "docs/gallery.md",
+    "docs/dsh-go.md",
     "README.md",
     "README.zh-CN.md",
     "CHANGELOG.md",
@@ -257,6 +258,44 @@
     },
     "@deepseek-ai/dsh-util-values": {
       "optional": true
+    }
+  },
+  "dshGo": {
+    "v": 1,
+    "title": {
+      "zh": "GenUI",
+      "en": "GenUI"
+    },
+    "icon": "chart",
+    "contributes": {
+      "composer.actions": [
+        {
+          "id": "open-genui",
+          "label": {
+            "zh": "GenUI",
+            "en": "GenUI"
+          },
+          "icon": "chart",
+          "effect": {
+            "type": "open",
+            "page": "panel:genui"
+          }
+        }
+      ],
+      "panels": [
+        {
+          "id": "genui",
+          "title": {
+            "zh": "GenUI",
+            "en": "GenUI"
+          },
+          "icon": "chart",
+          "placement": [
+            "session.tab",
+            "chat.panel"
+          ]
+        }
+      ]
     }
   }
 }

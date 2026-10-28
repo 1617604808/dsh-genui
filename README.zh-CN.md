@@ -316,6 +316,10 @@ node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 
 ---
 
+### dsh-go 接入
+
+dsh-go 适配使用 App 已有的原生卡片、正文选择与确认、插件面板，无需修改或重新安装 App。网页版继续读取完整的 GenUI 规格；原生面板支持选择、开关、按钮、提交、本地判卷、页签、折叠、复制和受控链接。正文围栏由验证工具生成网页与原生共用的 JSON。面板交互目前需要本机引擎提供 dsh-go 桥接；SSH、中转仍可显示原生工具卡。高级图形和自由输入等缺口会明确提示。详见[接入能力与验证范围](docs/dsh-go.md)。
+
 ### Sidechat surface 接入（可选）
 
 GenUI 可在 provider 明确提供的 sidechat surface 上渲染已结算的 `dsh-ui` 围栏。BetterSidebar 使用现有的 `registerSidechatSurfaceAdapter` 能力；其他 provider 可提供可选的 `genuiSidechat` Cordis service。每个 surface 都携带所属线程身份和专属 prompt 回调，因此动作与交互状态留在对应子线程。流式内容及不支持或无效的围栏保留原 Markdown。
