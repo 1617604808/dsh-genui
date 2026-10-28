@@ -18,11 +18,11 @@
  *   --install tarball 必须给 --tarball 绝对路径与 --tarball-sha256（防假安装）
  *   --smoke           不要求模型 Key：安装 → 启动 → 首页/client.js 200 →
  *                     无页面异常 → 插件 boot → Diff/Code/JSON 渲染与复制；
- *                     rc.3 Gallery 使用官方本地 replay 验证真实会话动作，不访问真实模型。
+ *                     rc.3 / alpha.2 Gallery 使用官方本地 replay 验证真实会话动作，不访问真实模型。
  *   --sidechat        显式启用双插件验收；仅允许 --smoke --install tarball，
  *                     会构建固定提交的 Better Sidebar，不改变原有 smoke 模式。
  *   --map             仅现有 Linux CI：sandboxed Chrome + 真实 Map WebGL/worker、
- *                     packed embed、离线 HTML；rc.3 官方 replay 验证一次显式提交。
+ *                     packed embed、离线 HTML；rc.3 / alpha.2 官方 replay 验证一次显式提交。
  * 退出码 0 = PASS，1 = FAIL。
  */
 
@@ -35,11 +35,13 @@ import { existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
+import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createGallerySpec, startGalleryImageServer } from './gallery-browser-checks.mjs'
 import { runGalleryFixedContexts } from './gallery-fixed-contexts.mjs'
 import { gallerySmokeEnvironment, prepareGalleryConversation } from './e2e-gallery-host.mjs'
 import { runSidechatCI, validateSidechatMode } from './sidechat-acceptance/ci.mjs'
+import { resolveExactHost } from './sidechat-acceptance/scripts/sidechat-host-contract.mjs'
 import { prepareMapConversation } from './e2e-map-host.mjs'
 import { createMapSpec, mapBrowserLaunchOptions, validateMapMode, safeMapError } from './map-acceptance/contract.mjs'
 import { runMapAcceptance } from './map-acceptance/run.mjs'
@@ -50,6 +52,12 @@ const DSH_ROOT = process.env.DSH_ROOT ?? resolve(process.env.HOME ?? '', '.dsh/s
 const DSH_BIN = process.env.DSH_BIN ?? join(DSH_ROOT, 'apps/cli/lib/bin.js')
 if (!resolve(DSH_BIN).startsWith('/')) fail('DSH_BIN 必须是绝对路径')
 if (!existsSync(DSH_BIN)) fail(`DSH_BIN 不存在: ${DSH_BIN}（在 DSH_ROOT 内先 pnpm run build）`)
+const HOST_LAYOUT = process.env.DSH_HOST_LAYOUT ?? 'source'
+assert.ok(['source', 'registry'].includes(HOST_LAYOUT), 'Explicit source or registry host layout required')
+if (HOST_LAYOUT === 'registry') assert.ok(process.env.DSH_HOST_VERSION, 'Published host requires an exact DSH_HOST_VERSION')
+const publishedHost = HOST_LAYOUT === 'registry'
+  ? await resolveExactHost({ dshRoot: DSH_ROOT, dshBin: DSH_BIN, hostLayout: HOST_LAYOUT, expectedVersion: process.env.DSH_HOST_VERSION })
+  : undefined
 const arg = (name) => {
   const index = process.argv.indexOf(name)
   return index === -1 ? undefined : process.argv[index + 1]
@@ -176,11 +184,11 @@ try {
   }
 
   if (MAP) {
-    galleryConversation = await prepareMapConversation({ dshRoot: DSH_ROOT, dshHome: DSH_HOME, spec: createMapSpec() })
+    galleryConversation = await prepareMapConversation({ dshRoot: DSH_ROOT, dshHome: DSH_HOME, spec: createMapSpec(), publishedHost })
   } else if (SMOKE) {
     galleryAssets = await startGalleryImageServer()
     galleryConversation = await prepareGalleryConversation({
-      dshRoot: DSH_ROOT, dshHome: DSH_HOME, spec: createGallerySpec(galleryAssets.origin),
+      dshRoot: DSH_ROOT, dshHome: DSH_HOME, spec: createGallerySpec(galleryAssets.origin), publishedHost,
     })
     if (galleryConversation === null) {
       await galleryAssets.close()
@@ -238,7 +246,9 @@ try {
   log('dsh web 就绪')
 
   // ── 浏览器链路 ──────────────────────────────────────────────────────────
-  const { chromium } = await import(pathToFileURL(join(DSH_ROOT, 'apps/web/node_modules/playwright/index.mjs')).href)
+  const { chromium } = publishedHost === undefined
+    ? await import(pathToFileURL(join(DSH_ROOT, 'apps/web/node_modules/playwright/index.mjs')).href)
+    : createRequire(join(publishedHost.root, 'package.json'))('playwright')
   browser = await chromium.launch(MAP ? mapBrowserLaunchOptions(process.env.E2E_CHROMIUM) : {
     ...(process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : { channel: 'chrome' }),
     headless: true,

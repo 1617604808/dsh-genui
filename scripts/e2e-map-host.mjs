@@ -34,12 +34,14 @@ export function replayChunks(text) {
   ] }
 }
 
-export async function prepareMapConversation({ dshRoot, dshHome, spec }) {
-  const host = JSON.parse(await readFile(join(dshRoot, 'apps/cli/package.json'), 'utf8'))
+export async function prepareMapConversation({ dshRoot, dshHome, spec, publishedHost }) {
+  const host = publishedHost === undefined
+    ? JSON.parse(await readFile(join(dshRoot, 'apps/cli/package.json'), 'utf8'))
+    : { version: publishedHost.hostVersion }
   // Minimum rc.1 continues to run the reusable DOM-fence visual checks only.
   if (host.version === '0.2.0-rc.1') return null
-  assert.equal(host.version, '0.2.1-rc.3', 'Unrecognized host must not silently skip conversation coverage')
-  const replayModule = join(dshRoot, 'packages/test-support/llm-replay/lib/index.js')
+  assert.ok(['0.2.1-rc.3', '0.2.2-alpha.2'].includes(host.version), 'Unrecognized host must not silently skip conversation coverage')
+  const replayModule = publishedHost?.modules.replayModule ?? join(dshRoot, 'packages/test-support/llm-replay/lib/index.js')
   await access(replayModule) // Missing official build output is a failure, not a skip.
   const root = join(dshHome, 'map-e2e')
   await mkdir(join(root, 'workspace'), { recursive: true })
