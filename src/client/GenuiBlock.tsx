@@ -103,7 +103,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const secret = new Set<string>()
     const declared = new Set<string>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map') && node.id !== undefined) declared.add(node.id)
       if (node.type !== 'input' || node.id === undefined) return
       if (node.inputType === 'number') numeric.add(node.id)
       if (node.inputType === 'password') secret.add(node.id)
