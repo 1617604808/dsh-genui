@@ -59,6 +59,11 @@ jobs:
       - name: Check published host API (typecheck + full unit suite + build)
         run: pnpm run check:host-api "${{ matrix.host-ref }}"
 
+      # rc.4 is on npm next; retain rc.3 for source-host browser acceptance.
+      - name: Check next published host API
+        if: matrix.role == 'current'
+        run: pnpm run check:host-api dsh-v0.2.1-rc.4
+
       - name: Verify and pack plugin tarball
         id: pack
         run: node scripts/verify-pack.mjs --keep

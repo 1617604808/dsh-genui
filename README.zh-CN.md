@@ -78,7 +78,7 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 ### 1. 环境准备
 
 安装前请确认满足以下条件：
-- **DSH 版本**：`^0.2.0-rc.1 || ^0.2.1-rc.1`（已在 `dsh-v0.2.0-rc.1` 与 `dsh-v0.2.1-rc.3` 上深度验证）
+- **DSH 版本**：`^0.2.0-rc.1 || ^0.2.1-rc.1`。安装包浏览器验收覆盖 `0.2.0-rc.1` 与 `0.2.1-rc.3`；npm `next` 的 `0.2.1-rc.4` 单独执行公开接口、完整单元测试与构建检查。`0.2.2` alpha 系列不在此支持范围内。
 - **pnpm 处于 PATH 中**：`dsh plugin` 底层依赖 pnpm。如尚未安装，请执行 `corepack enable` 或 `npm i -g pnpm`，之后**重新打开终端**，确认 `pnpm -v` 可正常输出。
 
 ### 2. 一键安装与激活
@@ -286,6 +286,7 @@ dsh plugin --profile web add link:$PWD
 pnpm run check           # 类型检查 + 单元测试 + 构建
 pnpm run test            # 运行 Vitest 测试套件
 pnpm run check:host-api dsh-v0.2.1-rc.3  # 检查当前发布版 DSH 的公开接口
+pnpm run check:host-api dsh-v0.2.1-rc.4  # 检查 npm next；与源码宿主浏览器验收分开
 node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 ```
 
@@ -389,7 +390,7 @@ dsh plugin --profile web add @changfenhuang/dsh-genui
 
 本项目遵循 [MIT License](LICENSE) 开源协议。
 
-### 原生地图
+### 交互式地图
 
 `map` 使用延迟加载的 MapLibre 标记和内联路线，并始终提供可键盘操作的地点列表。
 地点选择只在本地更新，可通过既有字段机制持久化并由独立提交按钮发送地点 ID。

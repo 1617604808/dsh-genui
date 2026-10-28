@@ -6,6 +6,11 @@ available keyboard-operable location list share one stable-ID selection. Pan,
 zoom, reset, and selection never send model actions. Use a separate `submit` to
 send the chosen ID through the existing fields contract.
 
+This interactive map is available in the web renderer, embed and standalone HTML.
+The dsh-go native App does not provide the MapLibre canvas or map selector;
+its native panel explicitly reports the unsupported map and any required map
+submission. See [dsh-go capabilities](dsh-go.md).
+
 ```dsh-ui
 {"title":"Choose a stop","items":[{"type":"map","id":"stop","title":"Synthetic itinerary","locations":[{"id":"museum","label":"Museum","coordinates":[12.49,41.89],"description":"Illustrative stop A"},{"id":"garden","label":"Garden","coordinates":[12.51,41.90],"description":"Illustrative stop B"}],"routes":[{"id":"walk","label":"Illustrative route, not directions","coordinates":[[12.49,41.89],[12.50,41.895],[12.51,41.90]]}]},{"type":"submit","label":"Use this stop","action":"choose_stop","groups":["stop"]}]}
 ```

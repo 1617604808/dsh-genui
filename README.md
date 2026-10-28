@@ -78,7 +78,7 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 ### 1. Prerequisites
 
 Ensure your environment meets the following requirements:
-- **DSH Version**: `^0.2.0-rc.1 || ^0.2.1-rc.1` (verified against `dsh-v0.2.0-rc.1` and `dsh-v0.2.1-rc.3`)
+- **DSH Version**: `^0.2.0-rc.1 || ^0.2.1-rc.1`. Packed browser acceptance covers `0.2.0-rc.1` and `0.2.1-rc.3`; npm `next` version `0.2.1-rc.4` has separate public-API, full-unit-suite and build checks. The `0.2.2` alpha line is not included in this support range.
 - **pnpm on PATH**: The `dsh plugin` CLI requires pnpm. If missing: run `corepack enable` or `npm i -g pnpm`, then **open a new terminal** and confirm `pnpm -v` prints a version number.
 
 ### 2. Install & Activate
@@ -287,6 +287,7 @@ dsh plugin --profile web add link:$PWD
 pnpm run check           # Type checks + full unit test suite + build
 pnpm run test            # Run Vitest unit tests
 pnpm run check:host-api dsh-v0.2.1-rc.3  # Check the current published DSH API
+pnpm run check:host-api dsh-v0.2.1-rc.4  # Check npm next; separate from source-host browser acceptance
 node scripts/verify-pack.mjs --keep  # Verify and inspect npm tarball
 ```
 
@@ -394,7 +395,7 @@ This version strictly requires DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`. Older host vers
 
 This project is licensed under the [MIT License](LICENSE).
 
-### Native maps
+### Interactive maps
 
 The `map` node combines lazy MapLibre markers and inline routes with an
 always-available keyboard-operable location list. Selection stays local and can

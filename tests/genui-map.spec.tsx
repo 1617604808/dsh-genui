@@ -164,6 +164,53 @@ it('retains the usable selection when a known blocked worker also rejects a conf
 
 
 describe('map integration with declared-field and structural identity rules', () => {
+  it('clears a removed choice while its map is hidden and does not revive it when locations return', async () => {
+    const onAction = vi.fn()
+    const snapshot = vi.fn()
+    const tabbed = (locations: GenuiMap['locations']): GenuiSpec => ({ items: [
+      { type: 'tabs', tabs: [
+        { label: 'Map tab', items: [{ ...map, locations }] },
+        { label: 'Other tab', items: [{ type: 'text', content: 'Other' }] },
+      ] },
+      spec.items[1]!,
+    ] })
+    const content = (locations: GenuiMap['locations']) => <GenuiActionContext.Provider value={onAction}>
+      <GenuiBlock spec={tabbed(locations)} onStateSnapshot={snapshot} />
+    </GenuiActionContext.Provider>
+    const view = render(content([a, b]))
+    await ready()
+    fireEvent.click(button('Beta'))
+    fireEvent.click(screen.getByRole('tab', { name: 'Other tab' }))
+    view.rerender(content([a]))
+    expect(button('Confirm')).toHaveProperty('disabled', true)
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ place: '' })
+    fireEvent.click(button('Confirm'))
+    expect(onAction).not.toHaveBeenCalled()
+    view.rerender(content([a, b]))
+    expect(button('Confirm')).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('tab', { name: 'Map tab' }))
+    await ready()
+    expect(button('Beta').getAttribute('aria-pressed')).toBe('false')
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ place: '' })
+  })
+
+  it('clears obsolete restored state in a hidden map without adopting its default selection', async () => {
+    const snapshot = vi.fn()
+    const hidden: GenuiSpec = { items: [
+      { type: 'tabs', tabs: [
+        { label: 'Other tab', items: [{ type: 'text', content: 'Other' }] },
+        { label: 'Map tab', items: [{ ...map, locations: [a], selected: 'a' }] },
+      ] },
+      spec.items[1]!,
+    ] }
+    render(<GenuiBlock spec={hidden} initialState={{ fields: { place: 'b' } }} onStateSnapshot={snapshot} />)
+    expect(button('Confirm')).toHaveProperty('disabled', true)
+    expect(snapshot.mock.calls.at(-1)?.[0].fields).toEqual({ place: '' })
+    fireEvent.click(screen.getByRole('tab', { name: 'Map tab' }))
+    await ready()
+    expect(button('Alpha').getAttribute('aria-pressed')).toBe('false')
+  })
+
   it('includes Map fields in snapshots and removes them only when the field is removed', async () => {
     const snapshot = vi.fn()
     const view = render(<GenuiBlock spec={spec} onStateSnapshot={snapshot} />)

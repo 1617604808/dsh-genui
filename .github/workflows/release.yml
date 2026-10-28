@@ -118,6 +118,9 @@ jobs:
       - name: Check minimum published host API
         run: pnpm run check:host-api "$MINIMUM_HOST_REF"
 
+      - name: Check next published host API
+        run: pnpm run check:host-api dsh-v0.2.1-rc.4
+
       - name: Verify and pack plugin tarball
         id: pack
         run: node scripts/verify-pack.mjs --keep
