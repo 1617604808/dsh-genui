@@ -514,6 +514,12 @@ export interface GenuiTable {
   filterColumn?: number
   /** Field id of a select whose value is a column header: sorts by it locally. */
   sortField?: string
+  /** Lay a long-text table out like prose instead of a data grid: the table
+   *  tracks the container width and every cell wraps, so a column of full
+   *  sentences reads in place instead of stretching the table into a
+   *  horizontal scrollbar. Omit (or `false`) for the data-table voice:
+   *  nowrap cells and horizontal scroll on overflow (see #326). */
+  wrap?: boolean
 }
 
 /** How a table column's cells render.

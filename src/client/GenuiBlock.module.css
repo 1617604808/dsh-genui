@@ -709,6 +709,28 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
   line-height: 1.5;
   vertical-align: middle;
 }
+/* `table.wrap: true` — prose layout: the table tracks the container and every
+   cell wraps, so a column of full sentences reads in place instead of
+   stretching the table into a horizontal scrollbar (#382). Opt-in because the
+   data-table voice above (nowrap + horizontal scroll on overflow, #326) is
+   still the right shape for short values.
+
+   Two rules keep this from regressing #326's column-collapse bug:
+   - `break-word` instead of `anywhere`: a long token (path, identifier) still
+     breaks, but the cell's min-content stays at word width; `anywhere` would
+     let the intrinsic size collapse to a single character, and a narrow column
+     of CJK then stacks one glyph per line.
+   - `min-width` gives every column a readable floor, so distributing the
+     container's width can never squeeze a short column to a sliver. */
+.tableWrapProse .table { width: 100%; min-width: 0; table-layout: auto; }
+.tableWrapProse .table th { white-space: normal; }
+.tableWrapProse .table td {
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
+  min-width: 6em;
+  vertical-align: top;
+}
 /* The first column is the row's name: give it the weight of a label so a
    table reads as "these rows, these values" instead of a uniform grid. */
 .table td:first-child { font-weight: 600; }

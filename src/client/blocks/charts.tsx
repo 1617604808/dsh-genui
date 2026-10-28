@@ -357,7 +357,9 @@ export const TableNode = memo(function TableNode({ node, renderDetail, filterVal
   }
 
   return (
-    <div className={css.tableWrap}>
+    <div className={[css.tableWrap, node.wrap === true ? css.tableWrapProse : undefined]
+      .filter(part => part !== undefined)
+      .join(' ') || undefined}>
       {node.export === true && <TableExportChips columns={columns} rows={rows} />}
       <table className={css.table}>
         <thead>
