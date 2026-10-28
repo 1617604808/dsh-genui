@@ -178,6 +178,7 @@ jobs:
         with:
           name: release-alpha-browser-acceptance
           retention-days: 7
+          include-hidden-files: true
           path: |
             gallery-*.png
             gallery-*.json

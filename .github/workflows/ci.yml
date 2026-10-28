@@ -238,6 +238,7 @@ jobs:
         with:
           name: published-alpha
           retention-days: 7
+          include-hidden-files: true
           path: |
             gallery-*.png
             gallery-*.json
