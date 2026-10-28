@@ -715,8 +715,8 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
       }
     }
     case 'svg': {
-      const code = str(v.code, GENUI_LIMITS.maxCode)
-      if (code === undefined) return null
+      const code = v.code
+      if (typeof code !== 'string' || code.length > GENUI_LIMITS.maxCode) return null
       return { type: 'svg', code, ...opt('title', str(v.title, GENUI_LIMITS.maxString)), ...opt('height', int(v.height, 100, 800)) }
     }
     case 'mermaid': {
@@ -2313,6 +2313,9 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
       break
     case 'svg':
       if (typeof v.code !== 'string') errors.push(`${at}: type 'svg' requires code (string)`)
+      else if (v.code.length > GENUI_LIMITS.maxCode) {
+        errors.push(`${at}.code length ${v.code.length} exceeds SVG limit ${GENUI_LIMITS.maxCode}; simplify or split the SVG`)
+      }
       isNum('height')
       break
     case 'mermaid':

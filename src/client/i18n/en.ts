@@ -321,6 +321,7 @@ export const EN = {
   'block.svgPreview': 'Preview',
   'block.svgSource': 'Source',
   'block.svgError': 'SVG could not be displayed — showing the source instead',
+  'block.svgTooLong': 'SVG has {actual} characters, exceeding the {max} character limit. Simplify or split the diagram.',
   'block.mermaidError': 'Diagram rendering failed — showing the source instead',
   'block.mermaidLoading': 'Rendering…',
   'block.scene3dLoading': 'Loading 3D scene…',

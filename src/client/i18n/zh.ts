@@ -316,6 +316,7 @@ export const ZH: Record<keyof typeof EN, string> = {
   'block.svgPreview': '预览',
   'block.svgSource': '源码',
   'block.svgError': 'SVG 无法显示，已降级显示源码',
+  'block.svgTooLong': 'SVG 有 {actual} 个字符，超过 {max} 个字符上限。请精简或拆分图形。',
   'block.mermaidError': '图表渲染失败，已显示源码',
   'block.mermaidLoading': '渲染中…',
   'block.scene3dLoading': '加载 3D 场景…',
