@@ -24,20 +24,29 @@ const hostCascade = document.createElement('style')
 hostCascade.textContent = '.case { overflow-wrap: anywhere } .case :not(pre) > code { display: inline-flex; padding: 0 5px; box-sizing: border-box }'
 document.head.appendChild(hostCascade)
 
-/** #326's incident table: six columns, a 51-char CJK product name, and one cell
- *  carrying a hard `\n`. This is the shape the data-table voice was tuned for. */
+/** Keep #326's six-column incident, including its CJK product name and hard
+ *  newline. The ASCII description makes the nowrap row exceed the container
+ *  even on Linux runners whose CJK fallback glyphs are narrower. Both modes
+ *  receive the same text, with ordinary word boundaries for prose wrapping. */
 const ISSUE_326_ROWS = [[
   '某店',
-  '洁柔粉Face悬挂抽纸280抽4层加厚柔韧可湿水不易烂可作洗脸巾可擦手面巾纸餐巾纸',
+  '洁柔粉Face悬挂抽纸280抽4层加厚柔韧可湿水不易烂可作洗脸巾可擦手面巾纸餐巾纸'
+    + ' — Soft and durable four layer tissue for everyday cleaning and hand drying.'
+    + ' The full product description stays readable when this comparison table wraps.',
   'SPU 10001035164766\nSKU 18506716626',
   '¥29.9',
   '1,234',
   '现货',
 ]]
 
-/** The #382 shape: a comparison table whose columns are full sentences. */
+/** Keep #382's comparison wording and extend the first measured row with
+ *  ASCII prose. The original CJK-only row can fit without wrapping on Linux,
+ *  so it cannot by itself prove the difference between the two layout modes. */
 const PROSE_ROWS = [
-  ['跨设备记忆同步评估 · 1.7k 字', '2 处，全部真命中（翻案腔、结论冒号）', '5 处顿号，约 3 处是技术枚举，其余是正常并列'],
+  ['跨设备记忆同步评估 · 1.7k 字', '2 处，全部真命中（翻案腔、结论冒号）',
+    '5 处顿号，约 3 处是技术枚举，其余是正常并列'
+      + ' — Review each technical list in context before changing the sentence.'
+      + ' The complete explanation should wrap inside its column without hiding the comparison.'],
   ['Reasonix 吸收评估 · 2.4k 字', '1 处，真命中', '23 处顿号，几乎全是技术名词枚举，需要逐条判断'],
 ]
 
