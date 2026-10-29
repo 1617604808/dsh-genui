@@ -2210,6 +2210,11 @@ button.ftNameBtn[aria-expanded] { cursor: pointer; }
   .skeletonControl { animation: none; }
 }
 
+/* The skeleton → component transition is animated in the DOM channel
+   (dom-fence: swapWithTransition) so it stays contained to the block: a
+   document-level View Transition cross-faded the whole page, which made the
+   prose below appear twice mid-flight. */
+
 /* ---------- staggered reveal ---------- */
 
 @keyframes genuiReveal {

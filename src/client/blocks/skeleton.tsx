@@ -29,7 +29,7 @@ export function GenuiSkeleton({ shape, title, columns, chartKind, lines }: {
     // Without it every gap/padding/radius resolved to nothing and the
     // placeholder painted as a hard-edged rectangle — the "毛坯" look.
     <div className={css.block}>
-      <div className={`${css.skeleton} ${INLINE_SHAPES.has(shape) ? css.skeletonInline : ''}`}
+      <div className={`${css.skeleton} ${INLINE_SHAPES.has(shape) || shape === 'generic' ? css.skeletonInline : ''}`}
         data-genui-skeleton={shape} role="status"
         aria-label={title === undefined ? '正在生成界面' : `正在生成界面：${title}`}>
         {title !== undefined ? <span className={css.skeletonHeading}>{title}</span> : null}
@@ -146,7 +146,6 @@ export function SkeletonBody({ shape, columns, chartKind, lines }: {
     case 'rule':
       return <span className={css.skeletonRule} />
     case 'card':
-    case 'generic':
     default:
       // A card's children are unknown from the prefix alone, so the placeholder
       // promises a heading + a couple of lines + one detail block, which is what

@@ -67,15 +67,21 @@ describe('streaming skeleton', () => {
     }
   })
 
-  it('uses the neutral shape while the component type is unknown', async () => {
+  it('shows nothing — and keeps the stock block — while the type is unknown', async () => {
+    // No `type` yet means no honest shape. A placeholder here is a guess that the
+    // next frame replaces, and covering the body with a wrong guess is worse than
+    // leaving it: the stock code block stays, nothing is mounted.
     const r = row('k2')
-    r.appendChild(stockCodeBlock('{"items":[{"ty', 'dsh-ui'))
+    const block = stockCodeBlock('{"items":[{"ty', 'dsh-ui')
+    r.appendChild(block)
     document.body.appendChild(r)
     const send = vi.fn()
     const dispose = installDomFenceRenderer(makeCtx('s2', send), send)
     try {
       await tick()
-      expect(r.querySelector('[data-genui-skeleton]')?.getAttribute('data-genui-skeleton')).toBe('generic')
+      expect(r.querySelector('[data-genui-skeleton]')).toBeNull()
+      expect(block.style.display).not.toBe('none')
+      expect(block.hasAttribute('data-genui-rendered')).toBe(false)
     } finally {
       dispose()
     }
