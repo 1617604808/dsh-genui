@@ -14,8 +14,8 @@
 //   2. omitting `wrap` (or `false`) keeps the exact DOM a data table had — no
 //      extra class, no layout change;
 //   3. the stylesheet declares the prose layout with the two guards that keep
-//      #326's column-collapse bug from coming back: `break-word` (never
-//      `anywhere`) and a `min-width` floor on cells;
+//      #326's column-collapse bug from coming back: wrapping long tokens with
+//      a readable minimum column width;
 //   4. the base data-table rules are still intact (nowrap + max-content).
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -23,6 +23,7 @@ import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
 import type { GenuiSpec } from '../src/client/spec.ts'
+import { processGenuiSpec } from '../src/client/guard.ts'
 
 afterEach(cleanup)
 
@@ -50,6 +51,16 @@ function wrapperOf(container: HTMLElement): HTMLElement {
 }
 
 describe('table.wrap opt-in prose layout', () => {
+  it('validates the public boolean field and preserves its opt-in meaning', () => {
+    for (const wrap of [true, false]) {
+      const result = processGenuiSpec(proseSpec(wrap))
+      expect(result.errors).toEqual([])
+      expect(result.spec?.items[0]).toMatchObject(wrap ? { wrap: true } : { type: 'table' })
+      if (!wrap) expect(result.spec?.items[0]).not.toHaveProperty('wrap')
+    }
+    const value = proseSpec(true)
+    expect(processGenuiSpec({ items: [{ ...value.items[0], wrap: 'true' }] }).errors.join(' ')).toContain('wrap')
+  })
   it('marks the scroll wrapper when wrap is true', () => {
     const { container } = render(<GenuiBlock spec={proseSpec(true)} />)
     expect(wrapperOf(container).className).toContain('tableWrapProse')
@@ -86,12 +97,10 @@ describe('table.wrap opt-in prose layout', () => {
     // the stylesheet source — same approach as the #249/#326 regression specs.
     const css = readFileSync(join(process.cwd(), 'src/client/GenuiBlock.module.css'), 'utf8')
     // The prose table tracks its container instead of sizing to max-content.
-    expect(css).toMatch(/\.tableWrapProse \.table\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*table-layout:\s*auto/)
-    // Cells wrap, with break-word (NOT anywhere) and a readable floor.
-    expect(css).toMatch(/\.tableWrapProse \.table td\s*\{[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*break-word[^}]*word-break:\s*normal[^}]*min-width:\s*6em/)
-    // `anywhere` is what collapsed short columns to one glyph per line (#326);
-    // it must never come back inside the prose rules.
-    expect(css).not.toMatch(/tableWrapProse[\s\S]{0,600}?overflow-wrap:\s*anywhere/)
+    expect(css).toMatch(/\.tableWrapProse > \.table\s*\{[^}]*width:\s*100%[^}]*min-width:\s*0[^}]*table-layout:\s*auto/)
+    // Long tokens participate in intrinsic sizing; the readable floor, rather
+    // than preserving an unbreakable token, protects narrow columns.
+    expect(css).toMatch(/\.tableWrapProse > \.table[^{}]*\{[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*anywhere[^}]*min-width:\s*6em/)
     // The data-table defaults (#326) stay untouched by the opt-in.
     expect(css).toMatch(/\.table\s*\{[^}]*width:\s*max-content[^}]*min-width:\s*100%/)
     expect(css).toMatch(/\.table th\s*\{[^}]*white-space:\s*nowrap/)

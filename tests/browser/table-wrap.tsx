@@ -8,7 +8,7 @@
  *    message column. A grid of short values must keep exactly this shape.
  *  - the opt-in prose layout (`wrap: true`): the table tracks the container and
  *    cells wrap, so a column of sentences is readable without a scrollbar —
- *    while `break-word` + a `min-width` floor keep #326's column-collapse bug
+ *    while token wrapping + a `min-width` floor keep #326's column-collapse bug
  *    (a short column squeezed to one glyph per line) from coming back.
  */
 import { createRoot } from 'react-dom/client'
@@ -20,6 +20,9 @@ import type { GenuiNode } from '../../src/client/spec.ts'
 const theme = document.createElement('style')
 theme.textContent = STANDALONE_THEME_CSS
 document.head.appendChild(theme)
+const hostCascade = document.createElement('style')
+hostCascade.textContent = '.case { overflow-wrap: anywhere } .case :not(pre) > code { display: inline-flex; padding: 0 5px; box-sizing: border-box }'
+document.head.appendChild(hostCascade)
 
 /** #326's incident table: six columns, a 51-char CJK product name, and one cell
  *  carrying a hard `\n`. This is the shape the data-table voice was tuned for. */
@@ -42,6 +45,7 @@ interface Case {
   name: string
   width: number
   node: GenuiNode
+  nested?: boolean
 }
 
 const cases: Case[] = [
@@ -83,6 +87,22 @@ const cases: Case[] = [
       wrap: true,
     },
   },
+  { name: 'long token, wrap', width: 400, node: {
+    type: 'table', wrap: true, columns: ['Name', 'Description'], rows: [['A', 'a'.repeat(140)]],
+  } },
+  { name: 'inline code, wrap', width: 400, node: {
+    type: 'table', wrap: true, columns: ['Name', 'Description'], rows: [['A', '`' + 'echo technical-value '.repeat(8) + '`']],
+  } },
+  { name: 'explicit newlines, wrap', width: 400, node: {
+    type: 'table', wrap: true, columns: ['Text', 'Code'], rows: [['第一行\n第二行', 'print(1)\n    print(2)']],
+  } },
+  { name: 'narrow six columns, wrap', width: 320, node: {
+    type: 'table', wrap: true, columns: ['店铺', '商品', '编码', '单价', '库存', '备注'], rows: ISSUE_326_ROWS,
+  } },
+  { name: 'nested default table', width: 400, nested: true, node: {
+    type: 'table', wrap: true, columns: ['Name', 'Description'], rows: [['Inspect', 'Details']],
+    details: [[{ type: 'table', wrap: false, columns: ['Nested', 'Data'], rows: [['A', '长文字'.repeat(35)]] }]],
+  } },
 ]
 
 const root = createRoot(document.getElementById('root')!)
@@ -104,11 +124,15 @@ flushSync(() => {
   )
 })
 
+flushSync(() => {
+  document.querySelector<HTMLButtonElement>('[data-case="nested default table"] button[aria-expanded="false"]')!.click()
+})
+
 const measurements = cases.map(testCase => {
   const host = document.querySelector<HTMLElement>(`[data-case="${testCase.name}"]`)!
-  const table = host.querySelector('table')!
+  const table = host.querySelector(testCase.nested ? 'table table' : 'table')!
   const wrap = table.parentElement as HTMLElement
-  const row = table.querySelector('tbody tr')!
+  const row = table.querySelector(':scope > tbody > tr')!
   const cells = [...row.children] as HTMLElement[]
   const colWidths = cells.map(cell => Math.round(cell.getBoundingClientRect().width))
   return {
@@ -120,6 +144,9 @@ const measurements = cases.map(testCase => {
     minColWidth: Math.min(...colWidths),
     rowHeight: Math.round(row.getBoundingClientRect().height),
     cellWhiteSpace: getComputedStyle(cells[0]!).whiteSpace,
+    cellWhiteSpaces: cells.map(cell => getComputedStyle(cell).whiteSpace),
+    cellText: cells.map(cell => cell.textContent),
+    codeWhiteSpace: table.querySelector('code') ? getComputedStyle(table.querySelector('code')!).whiteSpace : null,
     tableLayout: getComputedStyle(table).tableLayout,
   }
 })

@@ -92,7 +92,7 @@ try {
   const results = JSON.parse(decodeBrowserText(raw))
   await writeFile(join(out, 'results.json'), JSON.stringify(results, null, 2) + '\n')
 
-  if (results.length !== 4) throw new Error(`Expected 4 browser layout checks, got ${results.length}`)
+  if (results.length !== 9) throw new Error(`Expected 9 browser layout checks, got ${results.length}`)
   const byName = Object.fromEntries(results.map(result => [result.name, result]))
   const failures = []
   /** 记录一条失败的断言，保留完整测量结果方便对照。 */
@@ -128,6 +128,18 @@ try {
     check(proseWrap.minColWidth >= 80, `wrap prose table column floor missing: min column ${proseWrap.minColWidth}px — #326 collapse risk`)
     check(proseWrap.rowHeight > proseDefault.rowHeight, `wrap prose table must actually wrap (row ${proseWrap.rowHeight}px vs ${proseDefault.rowHeight}px unwrapped)`)
   }
+
+  for (const name of ['long token, wrap', 'inline code, wrap']) {
+    const result = byName[name]
+    check(result !== undefined && !result.overflows, `${name} must fit its 400px container`)
+  }
+  check(byName['inline code, wrap']?.codeWhiteSpace === 'pre-wrap', 'wrapped code must preserve spaces while wrapping')
+  const multiline = byName['explicit newlines, wrap']
+  check(multiline?.cellWhiteSpaces.join(',') === 'pre-line,pre-wrap', 'explicit prose and code newlines must keep their whitespace rules')
+  check(multiline?.cellText[1] === 'print(1)\n    print(2)', 'copyable code indentation and newlines must survive')
+  const narrow = byName['narrow six columns, wrap']
+  check(narrow?.overflows && narrow.minColWidth >= 80, 'a narrow six-column table must scroll with readable columns')
+  check(byName['nested default table']?.cellWhiteSpace === 'nowrap', 'parent wrapping must not change a nested default table')
 
   if (failures.length > 0) {
     throw new Error(`Browser table.wrap regression failed:\n${failures.map(line => `- ${line}`).join('\n')}\n\nmeasurements:\n${JSON.stringify(results, null, 2)}`)
